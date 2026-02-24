@@ -1,8 +1,8 @@
 import { registerPlugin } from '@capacitor/core';
 
-import type { PlugPagPluginPlugin } from './definitions';
+import type { PlugPagPlugin } from './definitions';
 
-const PlugPagPlugin = registerPlugin<PlugPagPluginPlugin>('PlugPagPlugin', {});
+const PlugPag = registerPlugin<PlugPagPlugin>('PlugPag', {});
 
 export * from './definitions';
-export { PlugPagPlugin };
+export { PlugPag };

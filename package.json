@@ -32,7 +32,7 @@
     "lint": "npm run eslint && npm run prettier -- --check",
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
-    "docgen": "docgen --api PlugPagPluginPlugin --output-readme README.md --output-json dist/docs.json",
+    "docgen": "docgen --api PlugPagPlugin --output-readme README.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
