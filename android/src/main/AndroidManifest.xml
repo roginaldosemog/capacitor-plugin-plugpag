@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.galago.plugins.plugpag">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.galago.plugins.plugpag">
 
     <uses-permission android:name="br.com.uol.pagseguro.permission.MANAGE_PAYMENTS" />
     
@@ -10,5 +9,6 @@
     <queries>
         <package android:name="br.com.uol.pagseguro.plugpagservice" />
     </queries>
+
     <application></application>
 </manifest>
