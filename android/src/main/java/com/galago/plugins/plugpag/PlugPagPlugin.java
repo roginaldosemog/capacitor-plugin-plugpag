@@ -14,8 +14,24 @@ public class PlugPagPlugin extends Plugin {
     @Override
     public void load() {
         implementation = new PlugPag();
-        // Passamos o contexto do Android para o SDK do PagSeguro
-        implementation.initializeWrapper(getContext());
+        if (getContext() != null) {
+            implementation.initializeWrapper(getContext());
+            com.getcapacitor.Logger.info("PlugPag", "SDK Wrapper inicializado com sucesso.");
+        }
+    }
+
+    @PluginMethod
+    public void isAuthenticated(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("value", implementation.isAuthenticated());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void isServiceBusy(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("value", implementation.isServiceBusy());
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -27,7 +43,6 @@ public class PlugPagPlugin extends Plugin {
             return;
         }
 
-        // Executa em background para não travar o App
         getBridge().execute(() -> {
             try {
                 JSObject result = implementation.initialize(activationCode);
@@ -41,7 +56,7 @@ public class PlugPagPlugin extends Plugin {
     @PluginMethod
     public void doPayment(PluginCall call) {
         Integer type = call.getInt("type", 1); // Ex: 1 = Crédito, 2 = Débito
-        Integer amount = call.getInt("amount"); // Em centavos!
+        Integer amount = call.getInt("amount"); // Centavos
         Integer installmentType = call.getInt("installmentType", 1);
         Integer installments = call.getInt("installments", 1);
         String userReference = call.getString("userReference", "");
@@ -57,7 +72,6 @@ public class PlugPagPlugin extends Plugin {
                 JSObject result = implementation.doPayment(
                     type, amount, installmentType, installments, userReference, printReceipt,
                     
-                    // Listener de Eventos (Isso manda as mensagens "Insira o Cartão" pro JS)
                     (message, eventCode) -> {
                         JSObject eventData = new JSObject();
                         eventData.put("message", message);
@@ -66,10 +80,8 @@ public class PlugPagPlugin extends Plugin {
                     }
                 );
                 
-                // Pagamento aprovado!
                 call.resolve(result);
             } catch (Exception e) {
-                // Pagamento negado ou erro
                 call.reject(e.getMessage());
             }
         });
