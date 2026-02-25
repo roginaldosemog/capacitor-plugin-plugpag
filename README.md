@@ -13,10 +13,11 @@ npx cap sync
 
 <docgen-index>
 
+* [`isAuthenticated()`](#isauthenticated)
+* [`isServiceBusy()`](#isservicebusy)
 * [`initialize(...)`](#initialize)
 * [`doPayment(...)`](#dopayment)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
-* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -24,13 +25,33 @@ npx cap sync
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
+### isAuthenticated()
+
+```typescript
+isAuthenticated() => Promise<{ value: boolean; }>
+```
+
+**Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
+
+--------------------
+
+
+### isServiceBusy()
+
+```typescript
+isServiceBusy() => Promise<{ value: boolean; }>
+```
+
+**Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
+
+--------------------
+
+
 ### initialize(...)
 
 ```typescript
 initialize(options: { activationCode: string; }) => Promise<{ status: string; }>
 ```
-
-Inicializa e ativa o terminal
 
 | Param         | Type                                     |
 | ------------- | ---------------------------------------- |
@@ -44,16 +65,14 @@ Inicializa e ativa o terminal
 ### doPayment(...)
 
 ```typescript
-doPayment(options: { type: number; amount: number; installmentType?: number; installments?: number; userReference?: string; printReceipt?: boolean; }) => Promise<any>
+doPayment(options: { type: number; amount: number; installmentType?: number; installments?: number; userReference: string; printReceipt?: boolean; }) => Promise<{ transactionCode: string; transactionId: string; message: string; }>
 ```
 
-Realiza um pagamento
+| Param         | Type                                                                                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ type: number; amount: number; installmentType?: number; installments?: number; userReference: string; printReceipt?: boolean; }</code> |
 
-| Param         | Type                                                                                                                                            |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ type: number; amount: number; installmentType?: number; installments?: number; userReference?: string; printReceipt?: boolean; }</code> |
-
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>Promise&lt;{ transactionCode: string; transactionId: string; message: string; }&gt;</code>
 
 --------------------
 
@@ -64,25 +83,12 @@ Realiza um pagamento
 addListener(eventName: 'paymentProgress', listenerFunc: (info: { message: string; code: number; }) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
-Escuta eventos da maquininha (mensagens de senha, processamento, etc)
-
 | Param              | Type                                                               |
 | ------------------ | ------------------------------------------------------------------ |
 | **`eventName`**    | <code>'paymentProgress'</code>                                     |
 | **`listenerFunc`** | <code>(info: { message: string; code: number; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
-
---------------------
-
-
-### removeAllListeners()
-
-```typescript
-removeAllListeners() => Promise<void>
-```
-
-Remove todos os listeners
 
 --------------------
 

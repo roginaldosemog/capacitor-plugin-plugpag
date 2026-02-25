@@ -1,33 +1,20 @@
 import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface PlugPagPlugin {
-  /**
-   * Inicializa e ativa o terminal
-   */
+  isAuthenticated(): Promise<{ value: boolean }>;
+  isServiceBusy(): Promise<{ value: boolean }>;
   initialize(options: { activationCode: string }): Promise<{ status: string }>;
-
-  /**
-   * Realiza um pagamento
-   */
   doPayment(options: {
     type: number;
     amount: number;
     installmentType?: number;
     installments?: number;
-    userReference?: string;
+    userReference: string;
     printReceipt?: boolean;
-  }): Promise<any>;
+  }): Promise<{ transactionCode: string; transactionId: string; message: string }>;
 
-  /**
-   * Escuta eventos da maquininha (mensagens de senha, processamento, etc)
-   */
   addListener(
     eventName: 'paymentProgress',
     listenerFunc: (info: { message: string; code: number }) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
-
-  /**
-   * Remove todos os listeners
-   */
-  removeAllListeners(): Promise<void>;
 }
