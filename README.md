@@ -17,6 +17,7 @@ npx cap sync
 * [`isServiceBusy()`](#isservicebusy)
 * [`initialize(...)`](#initialize)
 * [`doPayment(...)`](#dopayment)
+* [`abort()`](#abort)
 * [`voidPayment(...)`](#voidpayment)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
 * [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
@@ -79,15 +80,26 @@ doPayment(options: { type: number; amount: number; installmentType?: number; ins
 --------------------
 
 
+### abort()
+
+```typescript
+abort() => Promise<{ value: boolean; }>
+```
+
+**Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
+
+--------------------
+
+
 ### voidPayment(...)
 
 ```typescript
-voidPayment(options: { transactionCode: string; transactionId: string; amount: number; printReceipt?: boolean; }) => Promise<{ transactionCode: string; transactionId: string; message: string; }>
+voidPayment(options: { transactionCode: string; transactionId: string; printReceipt?: boolean; }) => Promise<{ transactionCode: string; transactionId: string; message: string; }>
 ```
 
-| Param         | Type                                                                                                     |
-| ------------- | -------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ transactionCode: string; transactionId: string; amount: number; printReceipt?: boolean; }</code> |
+| Param         | Type                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ transactionCode: string; transactionId: string; printReceipt?: boolean; }</code> |
 
 **Returns:** <code>Promise&lt;{ transactionCode: string; transactionId: string; message: string; }&gt;</code>
 

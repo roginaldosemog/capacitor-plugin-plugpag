@@ -88,6 +88,13 @@ public class PlugPagPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void abort(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("value", implementation.abort());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void voidPayment(PluginCall call) {
         String transactionCode = call.getString("transactionCode");
         String transactionId = call.getString("transactionId");

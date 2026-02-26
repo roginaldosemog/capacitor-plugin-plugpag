@@ -106,6 +106,10 @@ public class PlugPag {
         }
     }
 
+    public boolean abort() {
+        return plugPagWrapper.abort();
+    }
+
     public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (plugPagWrapper.isServiceBusy()) {
             throw new Exception("O serviço já está ocupado com outra operação.");
