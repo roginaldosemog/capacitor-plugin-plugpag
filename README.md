@@ -17,7 +17,9 @@ npx cap sync
 * [`isServiceBusy()`](#isservicebusy)
 * [`initialize(...)`](#initialize)
 * [`doPayment(...)`](#dopayment)
+* [`voidPayment(...)`](#voidpayment)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
+* [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -77,6 +79,21 @@ doPayment(options: { type: number; amount: number; installmentType?: number; ins
 --------------------
 
 
+### voidPayment(...)
+
+```typescript
+voidPayment(options: { transactionCode: string; transactionId: string; amount: number; printReceipt?: boolean; }) => Promise<{ transactionCode: string; transactionId: string; message: string; }>
+```
+
+| Param         | Type                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ transactionCode: string; transactionId: string; amount: number; printReceipt?: boolean; }</code> |
+
+**Returns:** <code>Promise&lt;{ transactionCode: string; transactionId: string; message: string; }&gt;</code>
+
+--------------------
+
+
 ### addListener('paymentProgress', ...)
 
 ```typescript
@@ -86,6 +103,22 @@ addListener(eventName: 'paymentProgress', listenerFunc: (info: { message: string
 | Param              | Type                                                               |
 | ------------------ | ------------------------------------------------------------------ |
 | **`eventName`**    | <code>'paymentProgress'</code>                                     |
+| **`listenerFunc`** | <code>(info: { message: string; code: number; }) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+
+--------------------
+
+
+### addListener('voidProgress', ...)
+
+```typescript
+addListener(eventName: 'voidProgress', listenerFunc: (info: { message: string; code: number; }) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+| Param              | Type                                                               |
+| ------------------ | ------------------------------------------------------------------ |
+| **`eventName`**    | <code>'voidProgress'</code>                                        |
 | **`listenerFunc`** | <code>(info: { message: string; code: number; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>

@@ -71,7 +71,7 @@ public class PlugPagPlugin extends Plugin {
             try {
                 JSObject result = implementation.doPayment(
                     type, amount, installmentType, installments, userReference, printReceipt,
-                    
+
                     (message, eventCode) -> {
                         JSObject eventData = new JSObject();
                         eventData.put("message", message);
@@ -79,7 +79,42 @@ public class PlugPagPlugin extends Plugin {
                         notifyListeners("paymentProgress", eventData);
                     }
                 );
-                
+
+                call.resolve(result);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void voidPayment(PluginCall call) {
+        String transactionCode = call.getString("transactionCode");
+        String transactionId = call.getString("transactionId");
+        Boolean printReceipt = call.getBoolean("printReceipt", true);
+
+        if (transactionCode == null) {
+            call.reject("O transactionCode é obrigatório.");
+            return;
+        }
+
+        if (transactionId == null) {
+            call.reject("O transactionId é obrigatório.");
+            return;
+        }
+
+        getBridge().execute(() -> {
+            try {
+                JSObject result = implementation.voidPayment(
+                    transactionCode, transactionId, printReceipt,
+                    (message, eventCode) -> {
+                        JSObject eventData = new JSObject();
+                        eventData.put("message", message);
+                        eventData.put("code", eventCode);
+                        notifyListeners("voidProgress", eventData);
+                    }
+                );
+
                 call.resolve(result);
             } catch (Exception e) {
                 call.reject(e.getMessage());

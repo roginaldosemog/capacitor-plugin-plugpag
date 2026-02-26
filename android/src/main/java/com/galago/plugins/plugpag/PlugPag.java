@@ -8,6 +8,7 @@ import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagEventListener;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagInitializationResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPaymentData;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagTransactionResult;
+import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagVoidData;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
 
@@ -100,6 +101,56 @@ public class PlugPag {
             }
         } catch (Exception e) {
             // 2. Se qualquer erro grave acontecer durante o processo, limpa o estado do SDK
+            plugPagWrapper.abort();
+            throw e;
+        }
+    }
+
+    public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
+        if (plugPagWrapper.isServiceBusy()) {
+            throw new Exception("O serviço já está ocupado com outra operação.");
+        }
+
+        if (!plugPagWrapper.isAuthenticated()) {
+            throw new Exception("POS não autenticado!");
+        }
+
+        try {
+            PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
+
+            plugPagWrapper.setEventListener(new PlugPagEventListener() {
+                int passwordCount = 0;
+                @Override
+                public void onEvent(PlugPagEventData data) {
+                    String msg;
+                    if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
+                        passwordCount++;
+                        msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
+                    } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
+                        passwordCount = 0;
+                        msg = "DIGITE A SENHA";
+                    } else {
+                        msg = data.getCustomMessage() != null ? data.getCustomMessage() : "AGUARDANDO...";
+                    }
+                    listener.onEvent(msg, data.getEventCode());
+                }
+            });
+
+            PlugPagTransactionResult result = plugPagWrapper.doVoid(voidData);
+
+            if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+                JSObject ret = new JSObject();
+                ret.put("transactionCode", result.getTransactionCode());
+                ret.put("transactionId", result.getTransactionId());
+                ret.put("message", result.getMessage());
+                return ret;
+            } else {
+                plugPagWrapper.abort();
+                String code = result.getErrorCode() != null ? result.getErrorCode() : "OPR_ERROR";
+                String msg = result.getMessage() != null ? result.getMessage() : "Erro no cancelamento";
+                throw new Exception(code + " - " + msg);
+            }
+        } catch (Exception e) {
             plugPagWrapper.abort();
             throw e;
         }

@@ -13,8 +13,19 @@ export interface PlugPagPlugin {
     printReceipt?: boolean;
   }): Promise<{ transactionCode: string; transactionId: string; message: string }>;
 
+  voidPayment(options: {
+    transactionCode: string;
+    transactionId: string;
+    printReceipt?: boolean;
+  }): Promise<{ transactionCode: string; transactionId: string; message: string }>;
+
   addListener(
     eventName: 'paymentProgress',
+    listenerFunc: (info: { message: string; code: number }) => void,
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+
+  addListener(
+    eventName: 'voidProgress',
     listenerFunc: (info: { message: string; code: number }) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }
