@@ -21,6 +21,7 @@ npx cap sync
 * [`voidPayment(...)`](#voidpayment)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
 * [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
+* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -112,6 +113,8 @@ voidPayment(options: { transactionCode: string; transactionId: string; printRece
 addListener(eventName: 'paymentProgress', listenerFunc: (info: { message: string; code: number; }) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
+Escuta o progresso do pagamento (mensagens como 'Insira o cartão', 'Senha', etc)
+
 | Param              | Type                                                               |
 | ------------------ | ------------------------------------------------------------------ |
 | **`eventName`**    | <code>'paymentProgress'</code>                                     |
@@ -128,12 +131,25 @@ addListener(eventName: 'paymentProgress', listenerFunc: (info: { message: string
 addListener(eventName: 'voidProgress', listenerFunc: (info: { message: string; code: number; }) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
+Escuta o progresso do estorno
+
 | Param              | Type                                                               |
 | ------------------ | ------------------------------------------------------------------ |
 | **`eventName`**    | <code>'voidProgress'</code>                                        |
 | **`listenerFunc`** | <code>(info: { message: string; code: number; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => Promise<void>
+```
+
+Remove todos os listeners ativos
 
 --------------------
 
