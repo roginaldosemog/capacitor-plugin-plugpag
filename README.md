@@ -83,10 +83,10 @@ doPayment(options: { type: number; amount: number; installmentType?: number; ins
 ### abort()
 
 ```typescript
-abort() => Promise<{ value: boolean; }>
+abort() => Promise<{ result: number; }>
 ```
 
-**Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
+**Returns:** <code>Promise&lt;{ result: number; }&gt;</code>
 
 --------------------
 

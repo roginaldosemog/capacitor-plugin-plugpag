@@ -6,10 +6,21 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @CapacitorPlugin(name = "PlugPag")
 public class PlugPagPlugin extends Plugin {
 
     private PlugPag implementation;
+
+    /**
+     * Pool de threads dedicado para operações bloqueantes do PlugPag SDK.
+     * Equivalente ao Dispatchers.IO do Kotlin: permite que doPayment e abort
+     * rodem CONCORRENTEMENTE em threads separadas do mesmo pool, sem bloquear
+     * o HandlerThread do Capacitor (getBridge().execute()).
+     */
+    private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
 
     @Override
     public void load() {
@@ -35,6 +46,16 @@ public class PlugPagPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void abort(PluginCall call) {
+        ioExecutor.submit(() -> {
+            int result = implementation.abort();
+            JSObject ret = new JSObject();
+            ret.put("result", result);
+            call.resolve(ret);
+        });
+    }
+
+    @PluginMethod
     public void initialize(PluginCall call) {
         String activationCode = call.getString("activationCode");
 
@@ -43,7 +64,7 @@ public class PlugPagPlugin extends Plugin {
             return;
         }
 
-        getBridge().execute(() -> {
+        ioExecutor.submit(() -> {
             try {
                 JSObject result = implementation.initialize(activationCode);
                 call.resolve(result);
@@ -55,8 +76,8 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void doPayment(PluginCall call) {
-        Integer type = call.getInt("type", 1); // Ex: 1 = Crédito, 2 = Débito
-        Integer amount = call.getInt("amount"); // Centavos
+        Integer type = call.getInt("type", 1);
+        Integer amount = call.getInt("amount");
         Integer installmentType = call.getInt("installmentType", 1);
         Integer installments = call.getInt("installments", 1);
         String userReference = call.getString("userReference", "");
@@ -67,7 +88,7 @@ public class PlugPagPlugin extends Plugin {
             return;
         }
 
-        getBridge().execute(() -> {
+        ioExecutor.submit(() -> {
             try {
                 JSObject result = implementation.doPayment(
                     type, amount, installmentType, installments, userReference, printReceipt,
@@ -88,13 +109,6 @@ public class PlugPagPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void abort(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("value", implementation.abort());
-        call.resolve(ret);
-    }
-
-    @PluginMethod
     public void voidPayment(PluginCall call) {
         String transactionCode = call.getString("transactionCode");
         String transactionId = call.getString("transactionId");
@@ -110,7 +124,7 @@ public class PlugPagPlugin extends Plugin {
             return;
         }
 
-        getBridge().execute(() -> {
+        ioExecutor.submit(() -> {
             try {
                 JSObject result = implementation.voidPayment(
                     transactionCode, transactionId, printReceipt,

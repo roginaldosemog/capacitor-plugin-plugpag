@@ -8,6 +8,7 @@ import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagEventListener;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagInitializationResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPaymentData;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagTransactionResult;
+import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagAbortResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagVoidData;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
@@ -25,6 +26,15 @@ public class PlugPag {
 
     public boolean isServiceBusy() {
         return plugPagWrapper.isServiceBusy();
+    }
+
+    public int abort() {
+        Logger.info("PlugPag", "abort() → chamando plugPagWrapper.abort()...");
+        PlugPagAbortResult abortResult = plugPagWrapper.abort();
+        Integer result = abortResult.getResult();
+        int code = result != null ? result : -1;
+        Logger.info("PlugPag", "abort() → resultado: " + code + " (0=OK, -1=ABORTED/ERRO)");
+        return code;
     }
 
     public void initializeWrapper(Context context) {
@@ -56,58 +66,49 @@ public class PlugPag {
             throw new Exception("POS não autenticado!");
         }
 
-        try {
-            // Monta os dados do pagamento
-            PlugPagPaymentData paymentData = new PlugPagPaymentData(
-                type, amount, installmentType, installments, userReference, printReceipt, false, false
-            );
+        // Monta os dados do pagamento
+        PlugPagPaymentData paymentData = new PlugPagPaymentData(
+            type, amount, installmentType, installments, userReference, printReceipt, false, false
+        );
 
-            // Escuta os eventos da maquininha (senha, processando, etc)
-            plugPagWrapper.setEventListener(new PlugPagEventListener() {
-                int passwordCount = 0;
-                @Override
-                public void onEvent(PlugPagEventData data) {
-                    String msg;
-                    if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
-                        passwordCount++;
-                        msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
-                    } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
-                        passwordCount = 0;
-                        msg = "DIGITE A SENHA";
-                    } else {
-                        msg = data.getCustomMessage() != null ? data.getCustomMessage() : "AGUARDANDO...";
-                    }
-                    
-                    // Dispara o evento para o bridge
-                    listener.onEvent(msg, data.getEventCode());
+        // Escuta os eventos da maquininha (senha, processando, etc)
+        plugPagWrapper.setEventListener(new PlugPagEventListener() {
+            int passwordCount = 0;
+            @Override
+            public void onEvent(PlugPagEventData data) {
+                String msg;
+                if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
+                    passwordCount++;
+                    msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
+                } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
+                    passwordCount = 0;
+                    msg = "DIGITE A SENHA";
+                } else {
+                    msg = data.getCustomMessage() != null ? data.getCustomMessage() : "AGUARDANDO...";
                 }
-            });
 
-            // Executa a transação (isso bloqueia a thread, por isso rodaremos em background no Plugin)
-            PlugPagTransactionResult result = plugPagWrapper.doPayment(paymentData);
-
-            if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
-                JSObject ret = new JSObject();
-                ret.put("transactionCode", result.getTransactionCode());
-                ret.put("transactionId", result.getTransactionId());
-                ret.put("message", result.getMessage());
-                return ret;
-            } else {
-                // Se o resultado não for OK, tentamos o abort por segurança
-                plugPagWrapper.abort();
-                String code = result.getErrorCode() != null ? result.getErrorCode() : "OPR_ERROR";
-                String msg = result.getMessage() != null ? result.getMessage() : "Erro na transação";
-                throw new Exception(code + " - " + msg);
+                // Dispara o evento para o bridge
+                listener.onEvent(msg, data.getEventCode());
             }
-        } catch (Exception e) {
-            // 2. Se qualquer erro grave acontecer durante o processo, limpa o estado do SDK
-            plugPagWrapper.abort();
-            throw e;
-        }
-    }
+        });
 
-    public boolean abort() {
-        return plugPagWrapper.abort();
+        // Executa a transação (bloqueia a thread até o terminal responder)
+        PlugPagTransactionResult result = plugPagWrapper.doPayment(paymentData);
+
+        // Limpa o listener após a operação (padrão do react-native-plugpag-nitro: clearEventListener)
+        plugPagWrapper.setEventListener(null);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            JSObject ret = new JSObject();
+            ret.put("transactionCode", result.getTransactionCode());
+            ret.put("transactionId", result.getTransactionId());
+            ret.put("message", result.getMessage());
+            return ret;
+        } else {
+            String code = result.getErrorCode() != null ? result.getErrorCode() : "OPR_ERROR";
+            String msg = result.getMessage() != null ? result.getMessage() : "Erro na transação";
+            throw new Exception(code + " - " + msg);
+        }
     }
 
     public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
@@ -119,44 +120,41 @@ public class PlugPag {
             throw new Exception("POS não autenticado!");
         }
 
-        try {
-            PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
+        PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
 
-            plugPagWrapper.setEventListener(new PlugPagEventListener() {
-                int passwordCount = 0;
-                @Override
-                public void onEvent(PlugPagEventData data) {
-                    String msg;
-                    if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
-                        passwordCount++;
-                        msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
-                    } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
-                        passwordCount = 0;
-                        msg = "DIGITE A SENHA";
-                    } else {
-                        msg = data.getCustomMessage() != null ? data.getCustomMessage() : "AGUARDANDO...";
-                    }
-                    listener.onEvent(msg, data.getEventCode());
+        plugPagWrapper.setEventListener(new PlugPagEventListener() {
+            int passwordCount = 0;
+            @Override
+            public void onEvent(PlugPagEventData data) {
+                String msg;
+                if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
+                    passwordCount++;
+                    msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
+                } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
+                    passwordCount = 0;
+                    msg = "DIGITE A SENHA";
+                } else {
+                    msg = data.getCustomMessage() != null ? data.getCustomMessage() : "AGUARDANDO...";
                 }
-            });
-
-            PlugPagTransactionResult result = plugPagWrapper.doVoid(voidData);
-
-            if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
-                JSObject ret = new JSObject();
-                ret.put("transactionCode", result.getTransactionCode());
-                ret.put("transactionId", result.getTransactionId());
-                ret.put("message", result.getMessage());
-                return ret;
-            } else {
-                plugPagWrapper.abort();
-                String code = result.getErrorCode() != null ? result.getErrorCode() : "OPR_ERROR";
-                String msg = result.getMessage() != null ? result.getMessage() : "Erro no cancelamento";
-                throw new Exception(code + " - " + msg);
+                listener.onEvent(msg, data.getEventCode());
             }
-        } catch (Exception e) {
-            plugPagWrapper.abort();
-            throw e;
+        });
+
+        PlugPagTransactionResult result = plugPagWrapper.voidPayment(voidData);
+
+        // Limpa o listener após a operação (padrão do react-native-plugpag-nitro: clearEventListener)
+        plugPagWrapper.setEventListener(null);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            JSObject ret = new JSObject();
+            ret.put("transactionCode", result.getTransactionCode());
+            ret.put("transactionId", result.getTransactionId());
+            ret.put("message", result.getMessage());
+            return ret;
+        } else {
+            String code = result.getErrorCode() != null ? result.getErrorCode() : "OPR_ERROR";
+            String msg = result.getMessage() != null ? result.getMessage() : "Erro no cancelamento";
+            throw new Exception(code + " - " + msg);
         }
     }
 }

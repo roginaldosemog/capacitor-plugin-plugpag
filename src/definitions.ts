@@ -13,7 +13,7 @@ export interface PlugPagPlugin {
     printReceipt?: boolean;
   }): Promise<{ transactionCode: string; transactionId: string; message: string }>;
 
-  abort(): Promise<{ value: boolean }>;
+  abort(): Promise<{ result: number }>;
 
   voidPayment(options: {
     transactionCode: string;
