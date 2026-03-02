@@ -19,6 +19,10 @@ npx cap sync
 * [`doPayment(...)`](#dopayment)
 * [`abort()`](#abort)
 * [`voidPayment(...)`](#voidpayment)
+* [`imprimirTexto(...)`](#imprimirtexto)
+* [`statusImpressora()`](#statusimpressora)
+* [`printFromFile(...)`](#printfromfile)
+* [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
 * [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
 * [`removeAllListeners()`](#removealllisteners)
@@ -103,6 +107,64 @@ voidPayment(options: { transactionCode: string; transactionId: string; printRece
 | **`options`** | <code>{ transactionCode: string; transactionId: string; printReceipt?: boolean; }</code> |
 
 **Returns:** <code>Promise&lt;{ transactionCode: string; transactionId: string; message: string; }&gt;</code>
+
+--------------------
+
+
+### imprimirTexto(...)
+
+```typescript
+imprimirTexto(options: { mensagem: string; alinhar?: string; size?: number; }) => Promise<void>
+```
+
+Imprime texto diretamente via PlugPag SDK.
+Compatível com a interface do plugin Gpos.
+
+| Param         | Type                                                                |
+| ------------- | ------------------------------------------------------------------- |
+| **`options`** | <code>{ mensagem: string; alinhar?: string; size?: number; }</code> |
+
+--------------------
+
+
+### statusImpressora()
+
+```typescript
+statusImpressora() => Promise<{ status: string; }>
+```
+
+Verifica o status da impressora.
+Compatível com a interface do plugin Gpos.
+
+**Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
+
+--------------------
+
+
+### printFromFile(...)
+
+```typescript
+printFromFile(options: { filePath: string; }) => Promise<{ result: number; }>
+```
+
+Imprime a partir de um arquivo no dispositivo.
+
+| Param         | Type                               |
+| ------------- | ---------------------------------- |
+| **`options`** | <code>{ filePath: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ result: number; }&gt;</code>
+
+--------------------
+
+
+### reprintCustomerReceipt()
+
+```typescript
+reprintCustomerReceipt() => Promise<void>
+```
+
+Reimprimir o último comprovante do cliente.
 
 --------------------
 

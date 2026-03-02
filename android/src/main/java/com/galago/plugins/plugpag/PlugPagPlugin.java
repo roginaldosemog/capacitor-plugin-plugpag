@@ -24,7 +24,6 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void abort(PluginCall call) {
-        // O abort deve rodar imediatamente sem esperar o semáforo
         ioExecutor.submit(() -> {
             int result = implementation.abort();
             JSObject ret = new JSObject();
@@ -47,7 +46,6 @@ public class PlugPagPlugin extends Plugin {
         ioExecutor.submit(() -> {
             boolean acquired = false;
             try {
-                // Se em 10s não liberar, provavelmente algo travou
                 acquired = operationMutex.tryAcquire(10, TimeUnit.SECONDS);
                 if (!acquired) {
                     call.reject("Terminal ocupado. Tente novamente ou cancele a operação.");
@@ -111,6 +109,49 @@ public class PlugPagPlugin extends Plugin {
             try {
                 call.resolve(implementation.initialize(code));
             } catch (Exception e) { call.reject(e.getMessage()); }
+        });
+    }
+
+    @PluginMethod
+    public void statusImpressora(PluginCall call) {
+        call.resolve(implementation.statusImpressora());
+    }
+
+    @PluginMethod
+    public void imprimirTexto(PluginCall call) {
+        String mensagem = call.getString("mensagem", "");
+        ioExecutor.submit(() -> {
+            try {
+                implementation.printText(mensagem);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Erro na impressão: " + e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void printFromFile(PluginCall call) {
+        String filePath = call.getString("filePath");
+        if (filePath == null) { call.reject("filePath obrigatório"); return; }
+        ioExecutor.submit(() -> {
+            try {
+                call.resolve(implementation.printFromFile(filePath));
+            } catch (Exception e) {
+                call.reject("Erro na impressão: " + e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void reprintCustomerReceipt(PluginCall call) {
+        ioExecutor.submit(() -> {
+            try {
+                implementation.reprintCustomerReceipt();
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Erro ao reimprimir: " + e.getMessage());
+            }
         });
     }
 }
