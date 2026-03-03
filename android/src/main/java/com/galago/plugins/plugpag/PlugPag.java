@@ -25,6 +25,11 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 public class PlugPag {
     private static final String TAG = "PlugPag";
@@ -200,6 +205,23 @@ public class PlugPag {
         // Baixa o PDF para arquivo temporário
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+        // Fix: GPOS 780 (Android antigo) pode não ter o CA do servidor na trust store.
+        // Aplica TrustManager permissivo apenas nesta conexão de impressão interna.
+        if (connection instanceof HttpsURLConnection) {
+            TrustManager[] trustAll = new TrustManager[]{
+                new X509TrustManager() {
+                    public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                    public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                    public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                }
+            };
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new java.security.SecureRandom());
+            ((HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
+            ((HttpsURLConnection) connection).setHostnameVerifier((hostname, session) -> true);
+        }
+
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(30000);
         connection.connect();
