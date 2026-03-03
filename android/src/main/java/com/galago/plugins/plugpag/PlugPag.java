@@ -139,13 +139,15 @@ public class PlugPag {
     public void printText(String text) throws Exception {
         // O PlugPag SDK espera uma imagem — renderizamos o texto num Bitmap com Canvas.
         int paperWidth = 384; // 58 mm a 203 DPI (PagBank Smart / Pro)
-        int padding = 20;
-        float textSize = 28f;
+        int padding = 8;
+        float textSize = 20f;
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setTextSize(textSize);
         paint.setColor(Color.BLACK);
         paint.setTextAlign(Paint.Align.LEFT);
+        // Fonte monospace: garante que as colunas do recibo se alinhem corretamente
+        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
 
         float lineHeight = paint.getFontSpacing();
         String[] lines = text.split("\n", -1);
@@ -163,11 +165,11 @@ public class PlugPag {
 
         File printDir = new File(context.getFilesDir(), "prints");
         printDir.mkdirs();
-        File imageFile = new File(printDir, "print_" + System.currentTimeMillis() + ".png");
+        File imageFile = new File(printDir, "print_" + System.currentTimeMillis() + ".jpg");
         imageFile.setReadable(true, false);
 
         FileOutputStream fos = new FileOutputStream(imageFile);
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos);
         fos.flush();
         fos.close();
         bitmap.recycle();
