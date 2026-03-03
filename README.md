@@ -23,6 +23,7 @@ npx cap sync
 * [`statusImpressora()`](#statusimpressora)
 * [`printFromFile(...)`](#printfromfile)
 * [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
+* [`printPdfFromUrl(...)`](#printpdffromurl)
 * [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
 * [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
 * [`removeAllListeners()`](#removealllisteners)
@@ -165,6 +166,21 @@ reprintCustomerReceipt() => Promise<void>
 ```
 
 Reimprimir o último comprovante do cliente.
+
+--------------------
+
+
+### printPdfFromUrl(...)
+
+```typescript
+printPdfFromUrl(options: { url: string; }) => Promise<void>
+```
+
+Baixa um PDF da URL informada, renderiza cada página como bitmap e imprime via PlugPag SDK.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ url: string; }</code> |
 
 --------------------
 

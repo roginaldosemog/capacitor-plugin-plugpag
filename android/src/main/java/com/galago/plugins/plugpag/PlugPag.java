@@ -17,9 +17,14 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.pdf.PdfRenderer;
+import android.os.ParcelFileDescriptor;
 import com.getcapacitor.JSObject;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class PlugPag {
     private static final String TAG = "PlugPag";
@@ -189,5 +194,65 @@ public class PlugPag {
 
     public void reprintCustomerReceipt() {
         plugPagWrapper.reprintCustomerReceipt();
+    }
+
+    public void printPdfFromUrl(String urlString) throws Exception {
+        // Baixa o PDF para arquivo temporário
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(30000);
+        connection.connect();
+
+        File printDir = new File(context.getFilesDir(), "prints");
+        printDir.mkdirs();
+        File pdfFile = new File(printDir, "doc_" + System.currentTimeMillis() + ".pdf");
+
+        try (InputStream in = connection.getInputStream();
+             FileOutputStream out = new FileOutputStream(pdfFile)) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) != -1) {
+                out.write(buffer, 0, len);
+            }
+        }
+
+        // Renderiza cada página do PDF como bitmap e imprime
+        ParcelFileDescriptor pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
+        PdfRenderer renderer = new PdfRenderer(pfd);
+        try {
+            int pageCount = renderer.getPageCount();
+            for (int i = 0; i < pageCount; i++) {
+                PdfRenderer.Page page = renderer.openPage(i);
+
+                int printWidth = 384;
+                float scale = (float) printWidth / page.getWidth();
+                int printHeight = (int) (page.getHeight() * scale);
+
+                // ARGB_8888 é exigido pelo PdfRenderer; fundo branco antes de renderizar
+                Bitmap bitmap = Bitmap.createBitmap(printWidth, printHeight + 40, Bitmap.Config.ARGB_8888);
+                bitmap.eraseColor(Color.WHITE);
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
+                page.close();
+
+                File pageFile = new File(printDir, "page_" + i + "_" + System.currentTimeMillis() + ".jpg");
+                pageFile.setReadable(true, false);
+                FileOutputStream fos = new FileOutputStream(pageFile);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
+                fos.flush();
+                fos.close();
+                bitmap.recycle();
+
+                try {
+                    printFromFile(pageFile.getAbsolutePath());
+                } finally {
+                    pageFile.delete();
+                }
+            }
+        } finally {
+            renderer.close();
+            pfd.close();
+            pdfFile.delete();
+        }
     }
 }

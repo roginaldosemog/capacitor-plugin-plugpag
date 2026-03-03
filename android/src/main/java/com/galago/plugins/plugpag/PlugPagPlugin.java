@@ -154,4 +154,18 @@ public class PlugPagPlugin extends Plugin {
             }
         });
     }
+
+    @PluginMethod
+    public void printPdfFromUrl(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null) { call.reject("url obrigatório"); return; }
+        ioExecutor.submit(() -> {
+            try {
+                implementation.printPdfFromUrl(url);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Erro ao imprimir PDF: " + e.getMessage());
+            }
+        });
+    }
 }

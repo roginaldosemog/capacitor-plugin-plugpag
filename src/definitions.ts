@@ -50,6 +50,11 @@ export interface PlugPagPlugin {
   reprintCustomerReceipt(): Promise<void>;
 
   /**
+   * Baixa um PDF da URL informada, renderiza cada página como bitmap e imprime via PlugPag SDK.
+   */
+  printPdfFromUrl(options: { url: string }): Promise<void>;
+
+  /**
    * Escuta o progresso do pagamento (mensagens como 'Insira o cartão', 'Senha', etc)
    */
   addListener(
