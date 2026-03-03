@@ -121,6 +121,22 @@ public class PlugPag {
             ret.put("transactionCode", result.getTransactionCode());
             ret.put("transactionId", result.getTransactionId());
             ret.put("message", result.getMessage());
+            ret.put("errorCode", result.getErrorCode());
+            ret.put("hostNsu", result.getHostNsu());
+            ret.put("date", result.getDate());
+            ret.put("time", result.getTime());
+            ret.put("cardBrand", result.getCardBrand());
+            ret.put("bin", result.getBin());
+            ret.put("holder", result.getHolder());
+            ret.put("userReference", result.getUserReference());
+            ret.put("terminalSerialNumber", result.getTerminalSerialNumber());
+            ret.put("amount", result.getAmount());
+            ret.put("availableBalance", result.getAvailableBalance());
+            ret.put("cardApplication", result.getCardApplication());
+            ret.put("label", result.getLabel());
+            ret.put("holderName", result.getHolderName());
+            ret.put("extendedHolderName", result.getExtendedHolderName());
+            ret.put("installments", result.getInstallments());
             return ret;
         } else {
             String code = result.getErrorCode() != null ? result.getErrorCode() : "ERROR";
