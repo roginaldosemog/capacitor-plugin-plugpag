@@ -276,7 +276,7 @@ public class PlugPag {
                 File pageFile = new File(printDir, "page_" + i + "_" + System.currentTimeMillis() + ".jpg");
                 pageFile.setReadable(true, false);
                 FileOutputStream fos = new FileOutputStream(pageFile);
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
                 fos.flush();
                 fos.close();
                 bitmap.recycle();
