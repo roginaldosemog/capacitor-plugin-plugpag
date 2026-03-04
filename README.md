@@ -1,12 +1,142 @@
 # capacitor-plugin-plugpag
 
-Plugin for PagSeguro Maquininha's PlugPag SDK
+<div align="center">
+  <h3>🤖 Integração PagSeguro PlugPag para Capacitor</h3>
+  <p>Pagamentos com maquininha PagBank direto no seu app Ionic/Angular com TypeScript completo</p>
 
-## Install
+  [![npm version](https://img.shields.io/npm/v/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
+  [![npm downloads](https://img.shields.io/npm/dm/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
+  [![license](https://img.shields.io/npm/l/capacitor-plugin-plugpag)](LICENSE)
+  [![Capacitor](https://img.shields.io/badge/Capacitor-7-blue)](https://capacitorjs.com/)
+</div>
+
+## ✨ Recursos
+
+- 💳 **Múltiplas formas de pagamento** — Crédito, Débito, Voucher e PIX
+- 🔄 **Estorno integrado** — Cancele transações com `transactionCode` e `transactionId`
+- 🖨️ **Impressão completa** — Texto, arquivo local e PDF por URL na impressora térmica da maquininha
+- 📡 **Eventos em tempo real** — Acompanhe o andamento do pagamento (`Insira o cartão`, `Digite a senha`, etc.)
+- 📘 **TypeScript nativo** — Tipagem completa com enums e interfaces
+- ⚡ **Capacitor 7** — Arquitetura moderna de plugin Capacitor com suporte a Android
+
+## 📦 Instalação
 
 ```bash
 npm install capacitor-plugin-plugpag
 npx cap sync
+```
+
+### Requisitos
+
+- Capacitor ≥ 7
+- Android API ≥ 21
+- Terminal PagBank (maquininha Smart) com SDK PlugPag
+
+## 🚀 Início rápido
+
+```typescript
+import { PlugPag, PaymentType, ErrorCode } from 'capacitor-plugin-plugpag';
+
+// 1. Inicializar o terminal
+await PlugPag.initialize({ activationCode: 'SEU_CODIGO_DE_ATIVACAO' });
+
+// 2. Processar pagamento (R$ 25,00)
+const resultado = await PlugPag.doPayment({
+  type: PaymentType.CREDIT,
+  amount: 2500, // em centavos
+  userReference: 'pedido-001',
+  printReceipt: true,
+});
+
+if (resultado.result === ErrorCode.OK) {
+  console.log('Pagamento aprovado!', resultado.transactionCode);
+}
+
+// 3. Estornar pagamento
+await PlugPag.voidPayment({
+  transactionCode: resultado.transactionCode,
+  transactionId: resultado.transactionId,
+  printReceipt: true,
+});
+```
+
+## 📡 Eventos de progresso
+
+Acompanhe cada etapa da transação em tempo real:
+
+```typescript
+import { PlugPag } from 'capacitor-plugin-plugpag';
+
+const listener = await PlugPag.addListener('paymentProgress', (event) => {
+  console.log(`[${event.code}] ${event.message}`);
+  // Exemplos: "Insira o cartão", "Digite a senha", "Processando..."
+});
+
+// Remover ao destruir o componente
+listener.remove();
+```
+
+## 🖨️ Impressão
+
+```typescript
+// Verificar status da impressora antes de imprimir
+const { status } = await PlugPag.statusImpressora();
+
+if (status === 'IMPRESSORA OK') {
+  // Imprimir texto simples
+  await PlugPag.imprimirTexto({ mensagem: 'Obrigado pela compra!\n\n\n' });
+
+  // Imprimir PDF de uma URL (renderiza cada página como bitmap)
+  await PlugPag.printPdfFromUrl({ url: 'https://exemplo.com/comprovante.pdf' });
+
+  // Reimprimir último comprovante do cliente
+  await PlugPag.reprintCustomerReceipt();
+}
+```
+
+## 🔗 Integração com Capacitor
+
+Este plugin segue o padrão oficial de plugins Capacitor. Após `npx cap sync`, o plugin é automaticamente registrado no Android. Nenhuma configuração adicional no `MainActivity.java` é necessária (Capacitor 3+).
+
+```typescript
+// O plugin é importado diretamente — sem necessidade de registrar manualmente
+import { PlugPag } from 'capacitor-plugin-plugpag';
+```
+
+> **Apenas Android.** A maquininha PagBank é um dispositivo Android. Chamadas em outras plataformas (web, iOS) resultarão em erro — use `Capacitor.getPlatform()` para verificar antes de chamar o plugin.
+
+```typescript
+import { Capacitor } from '@capacitor/core';
+
+if (Capacitor.getPlatform() === 'android') {
+  await PlugPag.doPayment({ ... });
+}
+```
+
+## ⚠️ Tratamento de erros
+
+```typescript
+import { PlugPag, PaymentType, ErrorCode } from 'capacitor-plugin-plugpag';
+
+try {
+  const result = await PlugPag.doPayment({ amount: 2500, type: PaymentType.CREDIT, userReference: 'ref-001' });
+
+  switch (result.result) {
+    case ErrorCode.OK:
+      console.log('Aprovado!', result.transactionCode);
+      break;
+    case ErrorCode.OPERATION_ABORTED:
+      console.log('Operação cancelada pelo usuário');
+      break;
+    case ErrorCode.COMMUNICATION_ERROR:
+      console.log('Erro de comunicação — verifique a conexão do terminal');
+      break;
+    default:
+      console.log('Falha no pagamento:', result.message);
+  }
+} catch (error) {
+  console.error('Erro inesperado:', error.message);
+}
 ```
 
 ## API
