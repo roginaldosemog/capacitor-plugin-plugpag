@@ -54,6 +54,7 @@ public class PlugPagPlugin extends Plugin {
 
                 JSObject result;
                 if (eventName.equals("paymentProgress")) {
+                    if (!call.hasOption("amount")) { call.reject("amount obrigatório"); return; }
                     result = implementation.doPayment(
                         call.getInt("type", 1),
                         call.getInt("amount"),
@@ -64,6 +65,8 @@ public class PlugPagPlugin extends Plugin {
                         (msg, code) -> notifyProgress(eventName, msg, code)
                     );
                 } else {
+                    if (call.getString("transactionCode") == null) { call.reject("transactionCode obrigatório"); return; }
+                    if (call.getString("transactionId") == null) { call.reject("transactionId obrigatório"); return; }
                     result = implementation.voidPayment(
                         call.getString("transactionCode"),
                         call.getString("transactionId"),

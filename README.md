@@ -1,13 +1,14 @@
 # capacitor-plugin-plugpag
 
 <div align="center">
-  <h3>🤖 Integração PagSeguro PlugPag para Capacitor</h3>
+  <h3>🤖 Integração PagBank PlugPag SDK para Ionic/Capacitor</h3>
   <p>Pagamentos com maquininha PagBank direto no seu app Ionic/Angular com TypeScript completo</p>
 
-  [![npm version](https://img.shields.io/npm/v/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
-  [![npm downloads](https://img.shields.io/npm/dm/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
-  [![license](https://img.shields.io/npm/l/capacitor-plugin-plugpag)](LICENSE)
-  [![Capacitor](https://img.shields.io/badge/Capacitor-7-blue)](https://capacitorjs.com/)
+[![npm version](https://img.shields.io/npm/v/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
+[![npm downloads](https://img.shields.io/npm/dm/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
+[![license](https://img.shields.io/npm/l/capacitor-plugin-plugpag)](LICENSE)
+[![Capacitor](https://img.shields.io/badge/Capacitor-7-blue)](https://capacitorjs.com/)
+
 </div>
 
 ## ✨ Recursos
@@ -250,7 +251,6 @@ imprimirTexto(options: { mensagem: string; alinhar?: string; size?: number; }) =
 ```
 
 Imprime texto diretamente via PlugPag SDK.
-Compatível com a interface do plugin Gpos.
 
 | Param         | Type                                                                |
 | ------------- | ------------------------------------------------------------------- |
@@ -266,7 +266,6 @@ statusImpressora() => Promise<{ status: string; }>
 ```
 
 Verifica o status da impressora.
-Compatível com a interface do plugin Gpos.
 
 **Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
 

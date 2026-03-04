@@ -114,7 +114,6 @@ export interface PlugPagPlugin {
 
   /**
    * Imprime texto diretamente via PlugPag SDK.
-   * Compatível com a interface do plugin Gpos.
    */
   imprimirTexto(options: {
     mensagem: string;
@@ -124,7 +123,6 @@ export interface PlugPagPlugin {
 
   /**
    * Verifica o status da impressora.
-   * Compatível com a interface do plugin Gpos.
    */
   statusImpressora(): Promise<{ status: string }>;
 

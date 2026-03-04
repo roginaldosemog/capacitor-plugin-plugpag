@@ -1,7 +1,7 @@
 {
   "name": "capacitor-plugin-plugpag",
-  "version": "1.0.0",
-  "description": "Plugin for PagSeguro Maquininha's PlugPag SDK",
+  "version": "1.1.0",
+  "description": "Integração PagBank PlugPag SDK para Ionic/Capacitor",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -13,7 +13,7 @@
     "dist/",
     "README.md"
   ],
-  "author": "",
+  "author": "Igor Gomes",
   "license": "MIT",
   "repository": {
     "type": "git",

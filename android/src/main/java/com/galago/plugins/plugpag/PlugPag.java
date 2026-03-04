@@ -17,6 +17,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.os.ParcelFileDescriptor;
 import com.getcapacitor.JSObject;
@@ -163,23 +164,23 @@ public class PlugPag {
     }
 
     public void printText(String text) throws Exception {
-        // O PlugPag SDK espera uma imagem — renderizamos o texto num Bitmap com Canvas.
+        // O SDK do PlugPag espera um arquivo de imagem — o texto é renderizado em um Bitmap com Canvas.
         int paperWidth = 384; // 58 mm a 203 DPI (PagBank Smart / Pro)
         int padding = 8;
-        float textSize = 20f;
+        float textSize = 26f;
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setTextSize(textSize);
         paint.setColor(Color.BLACK);
         paint.setTextAlign(Paint.Align.LEFT);
-        // Fonte monospace: garante que as colunas do recibo se alinhem corretamente
-        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
+        paint.setTypeface(Typeface.MONOSPACE);
+        paint.setFakeBoldText(true);
 
         float lineHeight = paint.getFontSpacing();
         String[] lines = text.split("\n", -1);
-        int bitmapHeight = (int) (lineHeight * lines.length) + padding * 2 + 80; // 80 = avanço de papel
+        int bitmapHeight = (int) (lineHeight * lines.length) + padding * 2 + 80; // 80px extras para avanço de papel
 
-        Bitmap bitmap = Bitmap.createBitmap(paperWidth, bitmapHeight, Bitmap.Config.RGB_565);
+        Bitmap bitmap = Bitmap.createBitmap(paperWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
         bitmap.eraseColor(Color.WHITE);
         Canvas canvas = new Canvas(bitmap);
 
@@ -195,7 +196,7 @@ public class PlugPag {
         imageFile.setReadable(true, false);
 
         FileOutputStream fos = new FileOutputStream(imageFile);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
         fos.flush();
         fos.close();
         bitmap.recycle();
@@ -218,12 +219,11 @@ public class PlugPag {
     }
 
     public void printPdfFromUrl(String urlString) throws Exception {
-        // Baixa o PDF para arquivo temporário
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
-        // Fix: GPOS 780 (Android antigo) pode não ter o CA do servidor na trust store.
-        // Aplica TrustManager permissivo apenas nesta conexão de impressão interna.
+        // Alguns dispositivos Android mais antigos podem não ter o CA do servidor na trust store.
+        // Um TrustManager permissivo é aplicado apenas nesta conexão de impressão.
         if (connection instanceof HttpsURLConnection) {
             TrustManager[] trustAll = new TrustManager[]{
                 new X509TrustManager() {
@@ -267,7 +267,7 @@ public class PlugPag {
                 float scale = (float) printWidth / page.getWidth();
                 int printHeight = (int) (page.getHeight() * scale);
 
-                // ARGB_8888 é exigido pelo PdfRenderer; fundo branco antes de renderizar
+                // ARGB_8888 é exigido pelo PdfRenderer
                 Bitmap bitmap = Bitmap.createBitmap(printWidth, printHeight + 40, Bitmap.Config.ARGB_8888);
                 bitmap.eraseColor(Color.WHITE);
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
@@ -276,7 +276,7 @@ public class PlugPag {
                 File pageFile = new File(printDir, "page_" + i + "_" + System.currentTimeMillis() + ".jpg");
                 pageFile.setReadable(true, false);
                 FileOutputStream fos = new FileOutputStream(pageFile);
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
                 fos.flush();
                 fos.close();
                 bitmap.recycle();
