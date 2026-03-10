@@ -123,9 +123,10 @@ public class PlugPagPlugin extends Plugin {
     @PluginMethod
     public void imprimirTexto(PluginCall call) {
         String mensagem = call.getString("mensagem", "");
+        float size = call.getFloat("size", 20f);
         ioExecutor.submit(() -> {
             try {
-                implementation.printText(mensagem);
+                implementation.printText(mensagem, size);
                 call.resolve();
             } catch (Exception e) {
                 call.reject("Erro na impressão: " + e.getMessage());

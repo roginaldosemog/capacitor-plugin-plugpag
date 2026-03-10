@@ -164,17 +164,22 @@ public class PlugPag {
     }
 
     public void printText(String text) throws Exception {
+        printText(text, 20f);
+    }
+
+    public void printText(String text, float textSize) throws Exception {
         // O SDK do PlugPag espera um arquivo de imagem — o texto é renderizado em um Bitmap com Canvas.
-        int paperWidth = 384; // 58 mm a 203 DPI (PagBank Smart / Pro)
+        // paperWidth = 384px (58mm a 203 DPI, PagBank Smart 2)
+        // Chars por linha ≈ (384 - 2*padding) / (textSize * 0.6)
+        // textSize=20f → ~30 chars | textSize=18f → ~34 chars | textSize=26f → ~23 chars (padrão antigo)
+        int paperWidth = 384;
         int padding = 8;
-        float textSize = 26f;
 
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setTextSize(textSize);
         paint.setColor(Color.BLACK);
         paint.setTextAlign(Paint.Align.LEFT);
         paint.setTypeface(Typeface.MONOSPACE);
-        paint.setFakeBoldText(true);
 
         float lineHeight = paint.getFontSpacing();
         String[] lines = text.split("\n", -1);
