@@ -56,24 +56,36 @@ public class PlugPag {
     public boolean isServiceBusy() { return plugPagWrapper.isServiceBusy(); }
 
     public int abort() {
+        Log.d(TAG, "abort() chamado");
         PlugPagAbortResult abortResult = plugPagWrapper.abort();
-        return abortResult.getResult(); 
+        Log.d(TAG, "abort() resultado: " + abortResult.getResult());
+        return abortResult.getResult();
     }
 
     public JSObject initialize(String activationCode) throws Exception {
+        if (plugPagWrapper.isAuthenticated()) {
+            Log.d(TAG, "initialize() ignorado — terminal já autenticado");
+            JSObject ret = new JSObject();
+            ret.put("status", "already_authenticated");
+            return ret;
+        }
+        Log.d(TAG, "initialize() iniciando ativação");
         PlugPagActivationData data = new PlugPagActivationData(activationCode);
         PlugPagInitializationResult result = plugPagWrapper.initializeAndActivatePinpad(data);
         if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "initialize() sucesso");
             JSObject ret = new JSObject();
             ret.put("status", "success");
             return ret;
         } else {
+            Log.e(TAG, "initialize() falhou: " + result.getErrorCode() + " - " + result.getErrorMessage());
             throw new Exception(result.getErrorCode() + ": " + result.getErrorMessage());
         }
     }
 
     public JSObject doPayment(int type, int amount, int installmentType, int installments, String userReference, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
+        Log.d(TAG, "doPayment() type=" + type + " amount=" + amount + " installments=" + installments + " ref=" + userReference);
 
         PlugPagPaymentData paymentData = new PlugPagPaymentData(
             type, amount, installmentType, installments, userReference, printReceipt, false, false
@@ -81,19 +93,30 @@ public class PlugPag {
 
         plugPagWrapper.setEventListener(createEventListener(listener));
         PlugPagTransactionResult result = plugPagWrapper.doPayment(paymentData);
-        
         plugPagWrapper.setEventListener(emptyListener);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "doPayment() aprovado — code=" + result.getTransactionCode() + " nsu=" + result.getHostNsu());
+        } else {
+            Log.e(TAG, "doPayment() negado — errorCode=" + result.getErrorCode() + " msg=" + result.getMessage());
+        }
         return parseResult(result);
     }
 
     public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
+        Log.d(TAG, "voidPayment() transactionCode=" + transactionCode);
+
         PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
-        
         plugPagWrapper.setEventListener(createEventListener(listener));
         PlugPagTransactionResult result = plugPagWrapper.voidPayment(voidData);
-        
         plugPagWrapper.setEventListener(emptyListener);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "voidPayment() estorno aprovado — code=" + result.getTransactionCode());
+        } else {
+            Log.e(TAG, "voidPayment() falhou — errorCode=" + result.getErrorCode() + " msg=" + result.getMessage());
+        }
         return parseResult(result);
     }
 
