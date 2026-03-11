@@ -38,7 +38,7 @@ public class PlugPag {
     private Context context;
 
     private final PlugPagEventListener emptyListener = new PlugPagEventListener() {
-        @Override public void onEvent(PlugPagEventData data) { /* do nothing */ }
+        @Override public void onEvent(PlugPagEventData data) {}
     };
 
     public interface PaymentEventListener {
@@ -87,6 +87,7 @@ public class PlugPag {
     }
 
     public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
+        if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
         PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
         
         plugPagWrapper.setEventListener(createEventListener(listener));
@@ -145,7 +146,7 @@ public class PlugPag {
         }
     }
 
-    public JSObject printFromFile(String filePath) throws Exception {
+    public void printFromFile(String filePath) throws Exception {
         PlugPagPrinterData printerData = new PlugPagPrinterData(filePath, 4, 0);
         plugPagWrapper.setPrinterListener(new PlugPagPrinterListener() {
             @Override
@@ -158,9 +159,9 @@ public class PlugPag {
             }
         });
         PlugPagPrintResult result = plugPagWrapper.printFromFile(printerData);
-        JSObject ret = new JSObject();
-        ret.put("result", result.getResult());
-        return ret;
+        if (result.getResult() != 0) {
+            throw new Exception("Falha na impressão: " + result.getMessage());
+        }
     }
 
     public void printText(String text) throws Exception {
@@ -168,10 +169,9 @@ public class PlugPag {
     }
 
     public void printText(String text, float textSize) throws Exception {
-        // O SDK do PlugPag espera um arquivo de imagem — o texto é renderizado em um Bitmap com Canvas.
-        // paperWidth = 384px (58mm a 203 DPI, PagBank Smart 2)
-        // Chars por linha ≈ (384 - 2*padding) / (textSize * 0.6)
-        // textSize=20f → ~30 chars | textSize=18f → ~34 chars | textSize=26f → ~23 chars (padrão antigo)
+        // O SDK PlugPag aceita apenas arquivos de imagem para impressão.
+        // O texto é renderizado em Bitmap monoespaçado (384 px = 58 mm a 203 DPI) e salvo como JPEG temporário.
+        // Referência de chars/linha por tamanho de fonte: size=18 → ~34 | size=20 → ~30 | size=26 → ~23
         int paperWidth = 384;
         int padding = 8;
 
@@ -213,9 +213,17 @@ public class PlugPag {
         }
     }
 
+    /**
+     * Verifica a conexão com o serviço PlugPag via IPC.
+     *
+     * <p><b>Atenção:</b> usa {@code isAuthenticated()} como proxy — não detecta falhas físicas
+     * da impressora (papel acabado, cabeçote, etc.). Erros físicos só aparecem ao tentar imprimir.
+     *
+     * @return {@code "IMPRESSORA OK"} se autenticado, {@code "TERMINAL NAO AUTENTICADO"} caso contrário.
+     */
     public JSObject statusImpressora() {
         JSObject ret = new JSObject();
-        ret.put("status", plugPagWrapper.isAuthenticated() ? "IMPRESSORA OK" : "ERRO DESCONHECIDO");
+        ret.put("status", plugPagWrapper.isAuthenticated() ? "IMPRESSORA OK" : "TERMINAL NAO AUTENTICADO");
         return ret;
     }
 
@@ -227,8 +235,8 @@ public class PlugPag {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
-        // Alguns dispositivos Android mais antigos podem não ter o CA do servidor na trust store.
-        // Um TrustManager permissivo é aplicado apenas nesta conexão de impressão.
+        // Dispositivos Android mais antigos podem não ter o CA do servidor na trust store.
+        // TrustManager permissivo aplicado somente aqui — não afeta outras conexões do app.
         if (connection instanceof HttpsURLConnection) {
             TrustManager[] trustAll = new TrustManager[]{
                 new X509TrustManager() {
@@ -260,7 +268,6 @@ public class PlugPag {
             }
         }
 
-        // Renderiza cada página do PDF como bitmap e imprime
         ParcelFileDescriptor pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
         PdfRenderer renderer = new PdfRenderer(pfd);
         try {

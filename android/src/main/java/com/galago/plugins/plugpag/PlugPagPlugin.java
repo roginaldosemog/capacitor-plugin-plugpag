@@ -10,10 +10,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Plugin Capacitor para integração com o terminal de pagamento PagBank via PlugPag SDK.
+ *
+ * <p>Toda comunicação com o SDK ocorre em thread de background ({@link ExecutorService})
+ * para não bloquear a thread principal do Capacitor. Um {@link Semaphore} garante que
+ * apenas uma operação financeira (pagamento ou estorno) aconteça por vez — tentativas
+ * concorrentes aguardam até 10 s e, se o terminal ainda estiver ocupado, retornam erro.
+ */
 @CapacitorPlugin(name = "PlugPag")
 public class PlugPagPlugin extends Plugin {
     private PlugPag implementation;
     private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
+
+    /** Impede doPayment e voidPayment simultâneos — o SDK PlugPag não suporta operações paralelas. */
     private final Semaphore operationMutex = new Semaphore(1);
 
     @Override
@@ -24,6 +34,7 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void abort(PluginCall call) {
+        // Não usa operationMutex: precisa interromper o doPayment bloqueante que já detém o mutex.
         ioExecutor.submit(() -> {
             int result = implementation.abort();
             JSObject ret = new JSObject();
@@ -92,16 +103,20 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void isAuthenticated(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("value", implementation.isAuthenticated());
-        call.resolve(ret);
+        ioExecutor.submit(() -> {
+            JSObject ret = new JSObject();
+            ret.put("value", implementation.isAuthenticated());
+            call.resolve(ret);
+        });
     }
 
     @PluginMethod
     public void isServiceBusy(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("value", implementation.isServiceBusy());
-        call.resolve(ret);
+        ioExecutor.submit(() -> {
+            JSObject ret = new JSObject();
+            ret.put("value", implementation.isServiceBusy());
+            call.resolve(ret);
+        });
     }
 
     @PluginMethod
@@ -117,7 +132,7 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void statusImpressora(PluginCall call) {
-        call.resolve(implementation.statusImpressora());
+        ioExecutor.submit(() -> call.resolve(implementation.statusImpressora()));
     }
 
     @PluginMethod
@@ -140,7 +155,8 @@ public class PlugPagPlugin extends Plugin {
         if (filePath == null) { call.reject("filePath obrigatório"); return; }
         ioExecutor.submit(() -> {
             try {
-                call.resolve(implementation.printFromFile(filePath));
+                implementation.printFromFile(filePath);
+                call.resolve();
             } catch (Exception e) {
                 call.reject("Erro na impressão: " + e.getMessage());
             }
