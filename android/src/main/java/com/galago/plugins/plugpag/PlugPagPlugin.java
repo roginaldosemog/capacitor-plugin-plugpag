@@ -10,10 +10,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Plugin Capacitor para integração com o terminal de pagamento PagBank via PlugPag SDK.
+ *
+ * <p>Toda comunicação com o SDK ocorre em thread de background ({@link ExecutorService})
+ * para não bloquear a thread principal do Capacitor. Um {@link Semaphore} garante que
+ * apenas uma operação financeira (pagamento ou estorno) aconteça por vez — tentativas
+ * concorrentes aguardam até 10 s e, se o terminal ainda estiver ocupado, retornam erro.
+ */
 @CapacitorPlugin(name = "PlugPag")
 public class PlugPagPlugin extends Plugin {
     private PlugPag implementation;
     private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
+
+    /** Impede doPayment e voidPayment simultâneos — o SDK PlugPag não suporta operações paralelas. */
     private final Semaphore operationMutex = new Semaphore(1);
 
     @Override
@@ -24,6 +34,7 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void abort(PluginCall call) {
+        // Não usa operationMutex: precisa interromper o doPayment bloqueante que já detém o mutex.
         ioExecutor.submit(() -> {
             int result = implementation.abort();
             JSObject ret = new JSObject();
