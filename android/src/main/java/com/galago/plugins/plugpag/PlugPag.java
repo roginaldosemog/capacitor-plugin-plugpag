@@ -146,7 +146,7 @@ public class PlugPag {
         }
     }
 
-    public JSObject printFromFile(String filePath) throws Exception {
+    public void printFromFile(String filePath) throws Exception {
         PlugPagPrinterData printerData = new PlugPagPrinterData(filePath, 4, 0);
         plugPagWrapper.setPrinterListener(new PlugPagPrinterListener() {
             @Override
@@ -159,9 +159,9 @@ public class PlugPag {
             }
         });
         PlugPagPrintResult result = plugPagWrapper.printFromFile(printerData);
-        JSObject ret = new JSObject();
-        ret.put("result", result.getResult());
-        return ret;
+        if (result.getResult() != 0) {
+            throw new Exception("Falha na impressão: " + result.getMessage());
+        }
     }
 
     public void printText(String text) throws Exception {

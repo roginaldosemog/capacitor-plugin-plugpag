@@ -274,8 +274,9 @@ export interface PlugPagPlugin {
    * Imprime a partir de um arquivo de imagem já salvo no dispositivo.
    *
    * @param options.filePath Caminho absoluto do arquivo (JPEG/PNG recomendado, largura 384 px).
+   * @throws Se a impressão falhar (impressora desconectada, papel acabado, etc.).
    */
-  printFromFile(options: { filePath: string }): Promise<{ result: ErrorCode }>;
+  printFromFile(options: { filePath: string }): Promise<void>;
 
   /**
    * Reimprimir o último comprovante do cliente diretamente pelo terminal.
