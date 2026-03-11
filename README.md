@@ -1,26 +1,22 @@
 # capacitor-plugin-plugpag
 
-<div align="center">
-  <h3>🤖 Integração PagBank PlugPag SDK para Ionic/Capacitor</h3>
-  <p>Pagamentos com maquininha PagBank direto no seu app Ionic/Angular com TypeScript completo</p>
+Plugin Capacitor para integração com terminais de pagamento PagBank via PlugPag SDK.
 
 [![npm version](https://img.shields.io/npm/v/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
 [![npm downloads](https://img.shields.io/npm/dm/capacitor-plugin-plugpag)](https://www.npmjs.com/package/capacitor-plugin-plugpag)
-[![license](https://img.shields.io/npm/l/capacitor-plugin-plugpag)](LICENSE)
 [![Capacitor](https://img.shields.io/badge/Capacitor-7-blue)](https://capacitorjs.com/)
+[![platform](https://img.shields.io/badge/platform-Android-green)](https://developer.android.com/)
 
-</div>
+## Recursos
 
-## ✨ Recursos
-
-- 💳 **Múltiplas formas de pagamento** — Crédito, Débito, Voucher e PIX
+- 💳 **Múltiplas formas de pagamento** — Crédito (à vista e parcelado), Débito, Voucher e PIX
 - 🔄 **Estorno integrado** — Cancele transações com `transactionCode` e `transactionId`
 - 🖨️ **Impressão completa** — Texto, arquivo local e PDF por URL na impressora térmica da maquininha
-- 📡 **Eventos em tempo real** — Acompanhe o andamento do pagamento (`Insira o cartão`, `Digite a senha`, etc.)
+- 📡 **Eventos em tempo real** — Acompanhe o andamento do pagamento (insira o cartão, digite a senha etc.)
 - 📘 **TypeScript nativo** — Tipagem completa com enums e interfaces
-- ⚡ **Capacitor 7** — Arquitetura moderna de plugin Capacitor com suporte a Android
+- ⚡ **Capacitor 7** — Arquitetura moderna de plugin Capacitor
 
-## 📦 Instalação
+## Instalação
 
 ```bash
 npm install capacitor-plugin-plugpag
@@ -31,140 +27,185 @@ npx cap sync
 
 - Capacitor ≥ 7
 - Android API ≥ 21
-- Terminal PagBank (maquininha Smart) com SDK PlugPag
+- Terminal PagBank com PlugPag SDK instalado
 
-## 🚀 Início rápido
+## Uso
+
+### Pagamento à vista
 
 ```typescript
-import { PlugPag, PaymentType, ErrorCode } from 'capacitor-plugin-plugpag';
+import { PlugPag, PaymentType, InstallmentType } from 'capacitor-plugin-plugpag';
 
-// 1. Inicializar o terminal
-await PlugPag.initialize({ activationCode: 'SEU_CODIGO_DE_ATIVACAO' });
+try {
+  const resultado = await PlugPag.doPayment({
+    type: PaymentType.CREDIT,
+    amount: 2500, // valor em centavos (R$ 25,00)
+    installments: 1,
+    userReference: 'PED001', // máx. 10 caracteres alfanuméricos
+    printReceipt: true,
+  });
 
-// 2. Processar pagamento (R$ 25,00)
+  console.log('Aprovado:', resultado.transactionCode);
+} catch (error) {
+  // Transação negada, cancelada ou erro de comunicação.
+  // error.message contém o código e a mensagem retornados pelo terminal.
+  console.error('Pagamento recusado:', error.message);
+}
+```
+
+### Crédito parcelado
+
+```typescript
+import { PlugPag, PaymentType, InstallmentType } from 'capacitor-plugin-plugpag';
+
+// Parcelado sem juros (lojista absorve) — use BUYER_INSTALLMENT para parcelado com juros
 const resultado = await PlugPag.doPayment({
   type: PaymentType.CREDIT,
-  amount: 2500, // em centavos
-  userReference: 'pedido-001',
+  amount: 15000, // R$ 150,00
+  installmentType: InstallmentType.SELLER_INSTALLMENT,
+  installments: 3, // 3x de R$ 50,00
+  userReference: 'PED002',
   printReceipt: true,
 });
+```
 
-if (resultado.result === ErrorCode.OK) {
-  console.log('Pagamento aprovado!', resultado.transactionCode);
+### Débito e PIX
+
+```typescript
+// Débito — sem parcelamento
+await PlugPag.doPayment({
+  type: PaymentType.DEBIT,
+  amount: 5000,
+  userReference: 'PED003',
+});
+
+// PIX
+await PlugPag.doPayment({
+  type: PaymentType.PIX,
+  amount: 5000,
+  userReference: 'PED004',
+});
+```
+
+### Acompanhando o progresso em tempo real
+
+Use `addListener` antes ou durante o pagamento para exibir o status ao operador.
+O evento `PaymentEvent` carrega `message` (texto para exibição) e `code` (veja `PaymentEventCode`).
+
+```typescript
+import { PlugPag, PaymentEventCode } from 'capacitor-plugin-plugpag';
+
+const handle = await PlugPag.addListener('paymentProgress', (event) => {
+  console.log(event.message); // ex: "Insira o cartão", "Digite a senha", "Processando..."
+
+  if (event.code === PaymentEventCode.CARD_INSERTED) {
+    // cartão físico inserido no terminal
+  }
+  if (event.code === PaymentEventCode.TRANSACTION_APPROVED) {
+    // aprovação confirmada antes do doPayment retornar
+  }
+});
+
+await PlugPag.doPayment({ ... });
+
+handle.remove(); // sempre remova o listener após a operação
+```
+
+### Estorno
+
+O estorno só é possível no mesmo dia da transação. Guarde `transactionCode` e `transactionId` do resultado do pagamento.
+
+```typescript
+try {
+  await PlugPag.voidPayment({
+    transactionCode: resultado.transactionCode,
+    transactionId: resultado.transactionId,
+    printReceipt: true,
+  });
+  console.log('Estorno concluído');
+} catch (error) {
+  console.error('Estorno recusado:', error.message);
 }
-
-// 3. Estornar pagamento
-await PlugPag.voidPayment({
-  transactionCode: resultado.transactionCode,
-  transactionId: resultado.transactionId,
-  printReceipt: true,
-});
 ```
 
-## 📡 Eventos de progresso
-
-Acompanhe cada etapa da transação em tempo real:
+### Impressão
 
 ```typescript
-import { PlugPag } from 'capacitor-plugin-plugpag';
-
-const listener = await PlugPag.addListener('paymentProgress', (event) => {
-  console.log(`[${event.code}] ${event.message}`);
-  // Exemplos: "Insira o cartão", "Digite a senha", "Processando..."
-});
-
-// Remover ao destruir o componente
-listener.remove();
-```
-
-## 🖨️ Impressão
-
-```typescript
-// Verificar status da impressora antes de imprimir
+// Verificar conexão com o serviço PlugPag antes de imprimir.
+// Atenção: este método confirma o IPC com o app PagBank, mas não detecta
+// falhas físicas da impressora (papel acabado, etc.).
 const { status } = await PlugPag.statusImpressora();
 
 if (status === 'IMPRESSORA OK') {
-  // Imprimir texto simples
-  await PlugPag.imprimirTexto({ mensagem: 'Obrigado pela compra!\n\n\n' });
+  // Texto simples — use '\n' para quebrar linhas
+  // Referência de largura: size=20 → ~30 chars/linha (padrão 58 mm)
+  await PlugPag.imprimirTexto({
+    mensagem: 'Obrigado pela compra!\n\n\n',
+    size: 20,
+  });
 
-  // Imprimir PDF de uma URL (renderiza cada página como bitmap)
+  // PDF por URL (renderiza cada página como bitmap 384 px)
   await PlugPag.printPdfFromUrl({ url: 'https://exemplo.com/comprovante.pdf' });
 
-  // Reimprimir último comprovante do cliente
+  // Reimprimir o último comprovante do cliente
   await PlugPag.reprintCustomerReceipt();
 }
 ```
 
-## 🔗 Integração com Capacitor
-
-Este plugin segue o padrão oficial de plugins Capacitor. Após `npx cap sync`, o plugin é automaticamente registrado no Android. Nenhuma configuração adicional no `MainActivity.java` é necessária (Capacitor 3+).
+### Cancelar uma operação em andamento
 
 ```typescript
-// O plugin é importado diretamente — sem necessidade de registrar manualmente
-import { PlugPag } from 'capacitor-plugin-plugpag';
+// Chame abort() para interromper um doPayment bloqueante.
+// O doPayment lançará exceção com mensagem contendo "RET_ABORT".
+await PlugPag.abort();
 ```
 
-> **Apenas Android.** A maquininha PagBank é um dispositivo Android. Chamadas em outras plataformas (web, iOS) resultarão em erro — use `Capacitor.getPlatform()` para verificar antes de chamar o plugin.
+### Verificar estado do terminal
 
 ```typescript
-import { Capacitor } from '@capacitor/core';
-
-if (Capacitor.getPlatform() === 'android') {
-  await PlugPag.doPayment({ ... });
-}
+const { value: autenticado } = await PlugPag.isAuthenticated();
+const { value: ocupado } = await PlugPag.isServiceBusy();
 ```
 
-## ⚠️ Tratamento de erros
+### Ativar o terminal (primeiro uso)
 
 ```typescript
-import { PlugPag, PaymentType, ErrorCode } from 'capacitor-plugin-plugpag';
-
-try {
-  const result = await PlugPag.doPayment({ amount: 2500, type: PaymentType.CREDIT, userReference: 'ref-001' });
-
-  switch (result.result) {
-    case ErrorCode.OK:
-      console.log('Aprovado!', result.transactionCode);
-      break;
-    case ErrorCode.OPERATION_ABORTED:
-      console.log('Operação cancelada pelo usuário');
-      break;
-    case ErrorCode.COMMUNICATION_ERROR:
-      console.log('Erro de comunicação — verifique a conexão do terminal');
-      break;
-    default:
-      console.log('Falha no pagamento:', result.message);
-  }
-} catch (error) {
-  console.error('Erro inesperado:', error.message);
-}
+// Necessário apenas na primeira execução ou após reset de fábrica.
+await PlugPag.initialize({ activationCode: 'SEU_CODIGO_PAGBANK' });
 ```
+
+---
 
 ## API
 
 <docgen-index>
 
-* [`isAuthenticated()`](#isauthenticated)
-* [`isServiceBusy()`](#isservicebusy)
-* [`initialize(...)`](#initialize)
-* [`doPayment(...)`](#dopayment)
-* [`abort()`](#abort)
-* [`voidPayment(...)`](#voidpayment)
-* [`imprimirTexto(...)`](#imprimirtexto)
-* [`statusImpressora()`](#statusimpressora)
-* [`printFromFile(...)`](#printfromfile)
-* [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
-* [`printPdfFromUrl(...)`](#printpdffromurl)
-* [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
-* [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
-* [`removeAllListeners()`](#removealllisteners)
-* [Interfaces](#interfaces)
-* [Enums](#enums)
+- [`isAuthenticated()`](#isauthenticated)
+- [`isServiceBusy()`](#isservicebusy)
+- [`initialize(...)`](#initialize)
+- [`doPayment(...)`](#dopayment)
+- [`abort()`](#abort)
+- [`voidPayment(...)`](#voidpayment)
+- [`imprimirTexto(...)`](#imprimirtexto)
+- [`statusImpressora()`](#statusimpressora)
+- [`printFromFile(...)`](#printfromfile)
+- [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
+- [`printPdfFromUrl(...)`](#printpdffromurl)
+- [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
+- [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
+- [`removeAllListeners()`](#removealllisteners)
+- [Interfaces](#interfaces)
+- [Enums](#enums)
 
 </docgen-index>
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
+
+Interface principal do plugin PlugPag para Capacitor.
+
+Permite integrar o terminal de pagamento PagBank Smart (e compatíveis) em aplicações
+Ionic/Capacitor via PlugPag SDK Android.
 
 ### isAuthenticated()
 
@@ -172,10 +213,11 @@ try {
 isAuthenticated() => Promise<{ value: boolean; }>
 ```
 
+Verifica se o terminal está autenticado com o serviço PlugPag (IPC ativo).
+
 **Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
---------------------
-
+---
 
 ### isServiceBusy()
 
@@ -183,10 +225,11 @@ isAuthenticated() => Promise<{ value: boolean; }>
 isServiceBusy() => Promise<{ value: boolean; }>
 ```
 
+Verifica se o serviço PlugPag está ocupado com uma operação em andamento.
+
 **Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
---------------------
-
+---
 
 ### initialize(...)
 
@@ -194,14 +237,16 @@ isServiceBusy() => Promise<{ value: boolean; }>
 initialize(options: { activationCode: string; }) => Promise<{ status: string; }>
 ```
 
+Inicializa e ativa o terminal com o código de ativação PagBank.
+Necessário apenas na primeira execução ou após reset de fábrica.
+
 | Param         | Type                                     |
 | ------------- | ---------------------------------------- |
 | **`options`** | <code>{ activationCode: string; }</code> |
 
 **Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
 
---------------------
-
+---
 
 ### doPayment(...)
 
@@ -209,14 +254,18 @@ initialize(options: { activationCode: string; }) => Promise<{ status: string; }>
 doPayment(options: { type: PaymentType; amount: number; installmentType?: InstallmentType; installments?: number; userReference: string; printReceipt?: boolean; }) => Promise<PlugPagTransactionResult>
 ```
 
+Inicia uma cobrança no terminal.
+
+O método é bloqueante até o terminal concluir (aprovado, negado ou cancelado).
+Use `addListener('paymentProgress', ...)` para acompanhar o progresso em tempo real.
+
 | Param         | Type                                                                                                                                                                                                                   |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ type: <a href="#paymenttype">PaymentType</a>; amount: number; installmentType?: <a href="#installmenttype">InstallmentType</a>; installments?: number; userReference: string; printReceipt?: boolean; }</code> |
 
 **Returns:** <code>Promise&lt;<a href="#plugpagtransactionresult">PlugPagTransactionResult</a>&gt;</code>
 
---------------------
-
+---
 
 ### abort()
 
@@ -224,10 +273,12 @@ doPayment(options: { type: PaymentType; amount: number; installmentType?: Instal
 abort() => Promise<{ result: ErrorCode; }>
 ```
 
+Aborta a operação de pagamento em andamento.
+Retorna imediatamente — o `doPayment` falhará com código `OPERATION_ABORTED (-1)`.
+
 **Returns:** <code>Promise&lt;{ result: <a href="#errorcode">ErrorCode</a>; }&gt;</code>
 
---------------------
-
+---
 
 ### voidPayment(...)
 
@@ -235,29 +286,42 @@ abort() => Promise<{ result: ErrorCode; }>
 voidPayment(options: { transactionCode: string; transactionId: string; printReceipt?: boolean; }) => Promise<PlugPagTransactionResult>
 ```
 
+Estorna (cancela) uma transação previamente aprovada.
+
+Só é possível no mesmo dia da transação original.
+Use `addListener('voidProgress', ...)` para acompanhar o progresso.
+
 | Param         | Type                                                                                     |
 | ------------- | ---------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ transactionCode: string; transactionId: string; printReceipt?: boolean; }</code> |
 
 **Returns:** <code>Promise&lt;<a href="#plugpagtransactionresult">PlugPagTransactionResult</a>&gt;</code>
 
---------------------
-
+---
 
 ### imprimirTexto(...)
 
 ```typescript
-imprimirTexto(options: { mensagem: string; alinhar?: string; size?: number; }) => Promise<void>
+imprimirTexto(options: { mensagem: string; size?: number; }) => Promise<void>
 ```
 
-Imprime texto diretamente via PlugPag SDK.
+Imprime texto diretamente na impressora térmica do terminal (58 mm / 384 px).
 
-| Param         | Type                                                                |
-| ------------- | ------------------------------------------------------------------- |
-| **`options`** | <code>{ mensagem: string; alinhar?: string; size?: number; }</code> |
+O texto é renderizado em um bitmap monoespaçado e enviado via PlugPag SDK.
+Use quebras de linha (`\n`) para múltiplas linhas.
 
---------------------
+**Referência de largura por tamanho de fonte:**
+| `size` | chars/linha aprox. |
+|--------|--------------------|
+| 18 | ~34 |
+| 20 | ~30 (recomendado) |
+| 26 | ~23 |
 
+| Param         | Type                                              |
+| ------------- | ------------------------------------------------- |
+| **`options`** | <code>{ mensagem: string; size?: number; }</code> |
+
+---
 
 ### statusImpressora()
 
@@ -265,29 +329,30 @@ Imprime texto diretamente via PlugPag SDK.
 statusImpressora() => Promise<{ status: string; }>
 ```
 
-Verifica o status da impressora.
+Verifica se o serviço PlugPag está autenticado e acessível.
+
+**Atenção:** este método usa `isAuthenticated()` como proxy — confirma que o IPC
+com o app PagBank está ativo, mas **não detecta falhas físicas** da impressora
+(papel acabado, cabeçote com defeito, etc.). Erros físicos são reportados apenas
+como resultado de uma tentativa de impressão.
 
 **Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
 
---------------------
-
+---
 
 ### printFromFile(...)
 
 ```typescript
-printFromFile(options: { filePath: string; }) => Promise<{ result: ErrorCode; }>
+printFromFile(options: { filePath: string; }) => Promise<void>
 ```
 
-Imprime a partir de um arquivo no dispositivo.
+Imprime a partir de um arquivo de imagem já salvo no dispositivo.
 
 | Param         | Type                               |
 | ------------- | ---------------------------------- |
 | **`options`** | <code>{ filePath: string; }</code> |
 
-**Returns:** <code>Promise&lt;{ result: <a href="#errorcode">ErrorCode</a>; }&gt;</code>
-
---------------------
-
+---
 
 ### reprintCustomerReceipt()
 
@@ -295,10 +360,9 @@ Imprime a partir de um arquivo no dispositivo.
 reprintCustomerReceipt() => Promise<void>
 ```
 
-Reimprimir o último comprovante do cliente.
+Reimprimir o último comprovante do cliente diretamente pelo terminal.
 
---------------------
-
+---
 
 ### printPdfFromUrl(...)
 
@@ -306,14 +370,17 @@ Reimprimir o último comprovante do cliente.
 printPdfFromUrl(options: { url: string; }) => Promise<void>
 ```
 
-Baixa um PDF da URL informada, renderiza cada página como bitmap e imprime via PlugPag SDK.
+Baixa um PDF da URL informada, renderiza cada página como bitmap (384 px de largura)
+e imprime via PlugPag SDK página a página.
+
+Em dispositivos Android mais antigos, um `TrustManager` permissivo é aplicado
+apenas para esta conexão HTTPS — valide o certificado do servidor antes de usar em produção.
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
 
---------------------
-
+---
 
 ### addListener('paymentProgress', ...)
 
@@ -321,7 +388,7 @@ Baixa um PDF da URL informada, renderiza cada página como bitmap e imprime via 
 addListener(eventName: 'paymentProgress', listenerFunc: (info: PaymentEvent) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
-Escuta o progresso do pagamento (mensagens como 'Insira o cartão', 'Senha', etc)
+Escuta eventos de progresso durante {@link doPayment}.
 
 | Param              | Type                                                                     |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -330,8 +397,7 @@ Escuta o progresso do pagamento (mensagens como 'Insira o cartão', 'Senha', etc
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
---------------------
-
+---
 
 ### addListener('voidProgress', ...)
 
@@ -339,7 +405,7 @@ Escuta o progresso do pagamento (mensagens como 'Insira o cartão', 'Senha', etc
 addListener(eventName: 'voidProgress', listenerFunc: (info: PaymentEvent) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
-Escuta o progresso do estorno
+Escuta eventos de progresso durante {@link voidPayment}.
 
 | Param              | Type                                                                     |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -348,8 +414,7 @@ Escuta o progresso do estorno
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
---------------------
-
+---
 
 ### removeAllListeners()
 
@@ -357,38 +422,39 @@ Escuta o progresso do estorno
 removeAllListeners() => Promise<void>
 ```
 
-Remove todos os listeners ativos
+Remove todos os listeners registrados neste plugin.
+Chame no `ngOnDestroy` ou equivalente para evitar memory leaks.
 
---------------------
-
+---
 
 ### Interfaces
 
-
 #### PlugPagTransactionResult
 
-| Prop                       | Type                |
-| -------------------------- | ------------------- |
-| **`transactionCode`**      | <code>string</code> |
-| **`transactionId`**        | <code>string</code> |
-| **`message`**              | <code>string</code> |
-| **`errorCode`**            | <code>string</code> |
-| **`hostNsu`**              | <code>string</code> |
-| **`date`**                 | <code>string</code> |
-| **`time`**                 | <code>string</code> |
-| **`cardBrand`**            | <code>string</code> |
-| **`bin`**                  | <code>string</code> |
-| **`holder`**               | <code>string</code> |
-| **`userReference`**        | <code>string</code> |
-| **`terminalSerialNumber`** | <code>string</code> |
-| **`amount`**               | <code>string</code> |
-| **`availableBalance`**     | <code>string</code> |
-| **`cardApplication`**      | <code>string</code> |
-| **`label`**                | <code>string</code> |
-| **`holderName`**           | <code>string</code> |
-| **`extendedHolderName`**   | <code>string</code> |
-| **`installments`**         | <code>string</code> |
+Resultado completo de uma transação (pagamento ou estorno).
+Todos os campos opcionais podem ser `undefined` dependendo da bandeira e do tipo de transação.
 
+| Prop                       | Type                | Description                                                                                  |
+| -------------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| **`transactionCode`**      | <code>string</code> | Código interno da transação — necessário para estorno via {@link PlugPagPlugin.voidPayment}. |
+| **`transactionId`**        | <code>string</code> | ID externo da transação — necessário para estorno via {@link PlugPagPlugin.voidPayment}.     |
+| **`message`**              | <code>string</code> | Mensagem de resposta do host autorizador.                                                    |
+| **`errorCode`**            | <code>string</code> | Código de erro do SDK (presente apenas em casos de falha tratada).                           |
+| **`hostNsu`**              | <code>string</code> | NSU do host autorizador.                                                                     |
+| **`date`**                 | <code>string</code> | Data da transação no formato retornado pelo terminal (DDMMAA).                               |
+| **`time`**                 | <code>string</code> | Hora da transação no formato retornado pelo terminal (HHmmss).                               |
+| **`cardBrand`**            | <code>string</code> | Bandeira do cartão (ex: "VISA", "MASTERCARD").                                               |
+| **`bin`**                  | <code>string</code> | Seis primeiros dígitos do cartão (BIN).                                                      |
+| **`holder`**               | <code>string</code> | Nome do portador do cartão conforme gravado na trilha.                                       |
+| **`userReference`**        | <code>string</code> | Referência enviada no momento do pagamento via `userReference`.                              |
+| **`terminalSerialNumber`** | <code>string</code> | Número de série do terminal PagBank.                                                         |
+| **`amount`**               | <code>string</code> | Valor cobrado em centavos como string (ex: `"15000"` para R$ 150,00).                        |
+| **`availableBalance`**     | <code>string</code> | Saldo disponível (para vouchers/pré-pagos).                                                  |
+| **`cardApplication`**      | <code>string</code> | Aplicação EMV selecionada pelo cartão.                                                       |
+| **`label`**                | <code>string</code> | Label da aplicação EMV.                                                                      |
+| **`holderName`**           | <code>string</code> | Nome do portador (campo curto).                                                              |
+| **`extendedHolderName`**   | <code>string</code> | Nome do portador (campo estendido, quando disponível).                                       |
+| **`installments`**         | <code>string</code> | Número de parcelas confirmadas pelo terminal como string (ex: `"3"`).                        |
 
 #### PluginListenerHandle
 
@@ -396,17 +462,17 @@ Remove todos os listeners ativos
 | ------------ | ----------------------------------------- |
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
-
 #### PaymentEvent
 
-| Prop          | Type                                                          |
-| ------------- | ------------------------------------------------------------- |
-| **`code`**    | <code><a href="#paymenteventcode">PaymentEventCode</a></code> |
-| **`message`** | <code>string</code>                                           |
+Evento de progresso emitido pelo terminal durante um pagamento ou estorno.
+Recebido via listener `paymentProgress` ou `voidProgress`.
 
+| Prop          | Type                                                          | Description                                                                                |
+| ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **`code`**    | <code><a href="#paymenteventcode">PaymentEventCode</a></code> | Código numérico do evento (veja {@link <a href="#paymenteventcode">PaymentEventCode</a>}). |
+| **`message`** | <code>string</code>                                           | Mensagem legível para exibição ao operador.                                                |
 
 ### Enums
-
 
 #### PaymentType
 
@@ -417,7 +483,6 @@ Remove todos os listeners ativos
 | **`VOUCHER`** | <code>3</code> |
 | **`PIX`**     | <code>5</code> |
 
-
 #### InstallmentType
 
 | Members                  | Value          |
@@ -425,7 +490,6 @@ Remove todos os listeners ativos
 | **`NO_INSTALLMENT`**     | <code>1</code> |
 | **`SELLER_INSTALLMENT`** | <code>2</code> |
 | **`BUYER_INSTALLMENT`**  | <code>3</code> |
-
 
 #### ErrorCode
 
@@ -437,7 +501,6 @@ Remove todos os listeners ativos
 | **`COMMUNICATION_ERROR`**   | <code>-3</code> |
 | **`NO_PRINTER_DEVICE`**     | <code>-4</code> |
 | **`NO_TRANSACTION_DATA`**   | <code>-5</code> |
-
 
 #### PaymentEventCode
 
