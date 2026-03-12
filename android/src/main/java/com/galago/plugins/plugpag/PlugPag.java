@@ -23,6 +23,7 @@ import android.os.ParcelFileDescriptor;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import java.io.File;
+import java.text.Normalizer;
 import java.util.List;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -213,10 +214,23 @@ public class PlugPag {
         printText(text, 20f);
     }
 
+    /**
+     * Normaliza o texto para ASCII removendo marcas diacríticas (acentos, cedilha, etc.).
+     * Necessário porque a impressora térmica / Typeface.MONOSPACE não suporta Latin Extended
+     * de forma confiável — caracteres multi-byte UTF-8 aparecem como sequências Latin-1 corrompidas.
+     * Ex: "Brasília" → "Brasilia", "São Paulo" → "Sao Paulo".
+     */
+    private static String normalizeForPrinter(String text) {
+        if (text == null) return "";
+        String nfd = Normalizer.normalize(text, Normalizer.Form.NFD);
+        return nfd.replaceAll("\\p{M}", "");
+    }
+
     public void printText(String text, float textSize) throws Exception {
         // O SDK PlugPag aceita apenas arquivos de imagem para impressão.
         // O texto é renderizado em Bitmap monoespaçado (384 px = 58 mm a 203 DPI) e salvo como JPEG temporário.
-        // Referência de chars/linha por tamanho de fonte: size=18 → ~34 | size=20 → ~30 | size=26 → ~23
+        // Referência de chars/linha por tamanho de fonte: size=18 → ~34 | size=20 → ~28 | size=26 → ~23
+        text = normalizeForPrinter(text);
         int paperWidth = 384;
         int padding = 8;
 
