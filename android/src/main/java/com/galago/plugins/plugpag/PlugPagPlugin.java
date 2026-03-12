@@ -1,5 +1,6 @@
 package com.galago.plugins.plugpag;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -54,6 +55,26 @@ public class PlugPagPlugin extends Plugin {
         executeBlockingOperation("voidProgress", call);
     }
 
+    @PluginMethod
+    public void calculateInstallments(PluginCall call) {
+        Integer value = call.getInt("value");
+        Integer installmentType = call.getInt("installmentType");
+        if (value == null) { call.reject("value obrigatório"); return; }
+        if (installmentType == null) { call.reject("installmentType obrigatório"); return; }
+        // Operação de consulta (somente-leitura) — não usa operationMutex para permitir
+        // que as duas chamadas paralelas (SELLER + BUYER) executem simultaneamente.
+        ioExecutor.submit(() -> {
+            try {
+                JSArray list = implementation.calculateInstallments(value, installmentType);
+                JSObject ret = new JSObject();
+                ret.put("installments", list);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
     /**
      * Executa doPayment ou voidPayment sob o mutex — impede operações bloqueantes paralelas.
      * O abort() deliberadamente NÃO usa o mutex: precisa interromper o doPayment que já o detém.
@@ -102,6 +123,7 @@ public class PlugPagPlugin extends Plugin {
     /**
      * Executa uma operação bloqueante simples (sem eventos de progresso) sob o mutex.
      * Cobre: initialize (ativação) e reprintCustomerReceipt.
+     * Nota: calculateInstallments NÃO usa este método — é consulta somente-leitura.
      */
     private void executeBlockingSimple(Callable<JSObject> action, PluginCall call) {
         ioExecutor.submit(() -> {

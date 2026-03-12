@@ -9,12 +9,13 @@ Plugin Capacitor para integração com terminais de pagamento PagBank via PlugPa
 
 ## Recursos
 
-- 💳 **Múltiplas formas de pagamento** — Crédito (à vista e parcelado), Débito, Voucher e PIX
-- 🔄 **Estorno integrado** — Cancele transações com `transactionCode` e `transactionId`
-- 🖨️ **Impressão completa** — Texto, arquivo local e PDF por URL na impressora térmica da maquininha
-- 📡 **Eventos em tempo real** — Acompanhe o andamento do pagamento (insira o cartão, digite a senha etc.)
-- 📘 **TypeScript nativo** — Tipagem completa com enums e interfaces
-- ⚡ **Capacitor 7** — Arquitetura moderna de plugin Capacitor
+- 💳 **Múltiplas formas de pagamento** — Aceite Crédito (à vista ou parcelado), Débito, Voucher e PIX
+- 📊 **Consulta de taxas na hora** — Valores de parcelas e totais calculados instantaneamente pelo terminal
+- 🔄 **Estorno integrado** — Cancele transações facilmente usando o código ou ID da venda
+- 🖨️ **Impressão completa** — Imprima textos, arquivos e PDFs diretamente na impressora térmica da maquininha
+- 📡 **Eventos em tempo real** — Acompanhe cada passo do pagamento (ex: "insira o cartão", "digite a senha")
+- 🔒 **Operações seguras** — Sistema de fila que evita conflitos e garante que um comando não atropele o outro
+- 📘 **TypeScript nativo** — Estrutura moderna e organizada com enums e interfaces
 
 ## Instalação
 
@@ -152,6 +153,51 @@ if (status === 'IMPRESSORA OK') {
 }
 ```
 
+### Consultar opções de parcelamento
+
+Use `calculateInstallments` para exibir ao operador as opções reais — com valores por parcela e total — antes de iniciar o pagamento.
+O método é bloqueante e consulta o serviço PagBank no terminal.
+
+```typescript
+import { PlugPag, InstallmentType } from 'capacitor-plugin-plugpag';
+
+const valorCentavos = Math.round(150.0 * 100); // R$ 150,00 → 15000 centavos
+
+// Parcelado sem juros — lojista absorve as taxas
+const { installments: semJuros } = await PlugPag.calculateInstallments({
+  value: valorCentavos,
+  installmentType: InstallmentType.SELLER_INSTALLMENT,
+});
+
+// Parcelado com juros — comprador paga as taxas ao emissor
+const { installments: comJuros } = await PlugPag.calculateInstallments({
+  value: valorCentavos,
+  installmentType: InstallmentType.BUYER_INSTALLMENT,
+});
+
+// Cada item de `installments`:
+// { installments: 3, installmentValue: 5000, totalValue: 15000 }
+//   ↳ todos os valores monetários estão em centavos (divida por 100 para exibir em reais)
+
+for (const op of comJuros) {
+  console.log(
+    `${op.installments}x de R$ ${(op.installmentValue / 100).toFixed(2)}`,
+    `— total R$ ${(op.totalValue / 100).toFixed(2)}`,
+  );
+}
+```
+
+> **Dica:** faça as duas chamadas em paralelo com `Promise.allSettled` para reduzir o tempo de carregamento.
+
+```typescript
+const [vendedor, comprador] = await Promise.allSettled([
+  PlugPag.calculateInstallments({ value: valorCentavos, installmentType: InstallmentType.SELLER_INSTALLMENT }),
+  PlugPag.calculateInstallments({ value: valorCentavos, installmentType: InstallmentType.BUYER_INSTALLMENT }),
+]);
+```
+
+---
+
 ### Cancelar uma operação em andamento
 
 ```typescript
@@ -185,6 +231,7 @@ await PlugPag.initialize({ activationCode: 'SEU_CODIGO_PAGBANK' });
 * [`initialize(...)`](#initialize)
 * [`doPayment(...)`](#dopayment)
 * [`abort()`](#abort)
+* [`calculateInstallments(...)`](#calculateinstallments)
 * [`voidPayment(...)`](#voidpayment)
 * [`imprimirTexto(...)`](#imprimirtexto)
 * [`statusImpressora()`](#statusimpressora)
@@ -277,10 +324,30 @@ Use `addListener('paymentProgress', ...)` para acompanhar o progresso em tempo r
 abort() => Promise<{ result: ErrorCode; }>
 ```
 
-Aborta a operação de pagamento em andamento.
-Retorna imediatamente — o `doPayment` falhará com código `OPERATION_ABORTED (-1)`.
+Aborta a operação em andamento (pagamento ou estorno).
+Retorna imediatamente — o `doPayment` ou `voidPayment` falhará com código `OPERATION_ABORTED (-1)`.
 
 **Returns:** <code>Promise&lt;{ result: <a href="#errorcode">ErrorCode</a>; }&gt;</code>
+
+--------------------
+
+
+### calculateInstallments(...)
+
+```typescript
+calculateInstallments(options: { value: number; installmentType: InstallmentType; }) => Promise<{ installments: PlugPagInstallment[]; }>
+```
+
+Consulta as opções de parcelamento para um valor e modalidade.
+
+Operação bloqueante — o SDK consulta o serviço PagBank e retorna os valores reais
+calculados com base no plano de recebimento do lojista vinculado ao terminal.
+
+| Param         | Type                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| **`options`** | <code>{ value: number; installmentType: <a href="#installmenttype">InstallmentType</a>; }</code> |
+
+**Returns:** <code>Promise&lt;{ installments: PlugPagInstallment[]; }&gt;</code>
 
 --------------------
 
@@ -470,6 +537,18 @@ Todos os campos opcionais podem ser `undefined` dependendo da bandeira e do tipo
 | **`holderName`**           | <code>string</code> | Nome do portador (campo curto).                                                              |
 | **`extendedHolderName`**   | <code>string</code> | Nome do portador (campo estendido, quando disponível).                                       |
 | **`installments`**         | <code>string</code> | Número de parcelas confirmadas pelo terminal como string (ex: `"3"`).                        |
+
+
+#### PlugPagInstallment
+
+Uma opção de parcelamento retornada por {@link PlugPagPlugin.calculateInstallments}.
+Os valores monetários estão em centavos (divida por 100 para exibir em reais).
+
+| Prop                   | Type                | Description                                                |
+| ---------------------- | ------------------- | ---------------------------------------------------------- |
+| **`installments`**     | <code>number</code> | Número de parcelas (ex: `3` para 3x).                      |
+| **`installmentValue`** | <code>number</code> | Valor de cada parcela em centavos (ex: `5670` = R$ 56,70). |
+| **`totalValue`**       | <code>number</code> | Valor total com juros em centavos.                         |
 
 
 #### PluginListenerHandle

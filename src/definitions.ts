@@ -94,6 +94,19 @@ export enum PaymentEventCode {
 }
 
 /**
+ * Uma opção de parcelamento retornada por {@link PlugPagPlugin.calculateInstallments}.
+ * Os valores monetários estão em centavos (divida por 100 para exibir em reais).
+ */
+export interface PlugPagInstallment {
+  /** Número de parcelas (ex: `3` para 3x). */
+  installments: number;
+  /** Valor de cada parcela em centavos (ex: `5670` = R$ 56,70). */
+  installmentValue: number;
+  /** Valor total com juros em centavos. */
+  totalValue: number;
+}
+
+/**
  * Evento de progresso emitido pelo terminal durante um pagamento ou estorno.
  * Recebido via listener `paymentProgress` ou `voidProgress`.
  */
@@ -215,10 +228,26 @@ export interface PlugPagPlugin {
   }): Promise<PlugPagTransactionResult>;
 
   /**
-   * Aborta a operação de pagamento em andamento.
-   * Retorna imediatamente — o `doPayment` falhará com código `OPERATION_ABORTED (-1)`.
+   * Aborta a operação em andamento (pagamento ou estorno).
+   * Retorna imediatamente — o `doPayment` ou `voidPayment` falhará com código `OPERATION_ABORTED (-1)`.
    */
   abort(): Promise<{ result: ErrorCode }>;
+
+  /**
+   * Consulta as opções de parcelamento para um valor e modalidade.
+   *
+   * Operação bloqueante — o SDK consulta o serviço PagBank e retorna os valores reais
+   * calculados com base no plano de recebimento do lojista vinculado ao terminal.
+   *
+   * @param options.value           Valor da venda **em centavos** (ex: `15000` para R$ 150,00).
+   * @param options.installmentType Modalidade: `SELLER_INSTALLMENT` ou `BUYER_INSTALLMENT`.
+   * @returns Lista de opções; cada item contém `installments`, `installmentValue` e `totalValue` (em centavos).
+   * @throws Se o terminal não estiver autenticado ou o serviço estiver indisponível.
+   */
+  calculateInstallments(options: {
+    value: number;
+    installmentType: InstallmentType;
+  }): Promise<{ installments: PlugPagInstallment[] }>;
 
   /**
    * Estorna (cancela) uma transação previamente aprovada.
