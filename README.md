@@ -9,12 +9,13 @@ Plugin Capacitor para integração com terminais de pagamento PagBank via PlugPa
 
 ## Recursos
 
-- 💳 **Múltiplas formas de pagamento** — Crédito (à vista e parcelado), Débito, Voucher e PIX
-- 🔄 **Estorno integrado** — Cancele transações com `transactionCode` e `transactionId`
-- 🖨️ **Impressão completa** — Texto, arquivo local e PDF por URL na impressora térmica da maquininha
-- 📡 **Eventos em tempo real** — Acompanhe o andamento do pagamento (insira o cartão, digite a senha etc.)
-- 📘 **TypeScript nativo** — Tipagem completa com enums e interfaces
-- ⚡ **Capacitor 7** — Arquitetura moderna de plugin Capacitor
+- 💳 **Múltiplas formas de pagamento** — Aceite Crédito (à vista ou parcelado), Débito, Voucher e PIX
+- 📊 **Consulta de taxas na hora** — Valores de parcelas e totais calculados instantaneamente pelo terminal
+- 🔄 **Estorno integrado** — Cancele transações facilmente usando o código ou ID da venda
+- 🖨️ **Impressão completa** — Imprima textos, arquivos e PDFs diretamente na impressora térmica da maquininha
+- 📡 **Eventos em tempo real** — Acompanhe cada passo do pagamento (ex: "insira o cartão", "digite a senha")
+- 🔒 **Operações seguras** — Sistema de fila que evita conflitos e garante que um comando não atropele o outro
+- 📘 **TypeScript nativo** — Estrutura moderna e organizada com enums e interfaces
 
 ## Instalação
 
@@ -152,6 +153,51 @@ if (status === 'IMPRESSORA OK') {
 }
 ```
 
+### Consultar opções de parcelamento
+
+Use `calculateInstallments` para exibir ao operador as opções reais — com valores por parcela e total — antes de iniciar o pagamento.
+O método é bloqueante e consulta o serviço PagBank no terminal.
+
+```typescript
+import { PlugPag, InstallmentType } from 'capacitor-plugin-plugpag';
+
+const valorCentavos = Math.round(150.0 * 100); // R$ 150,00 → 15000 centavos
+
+// Parcelado sem juros — lojista absorve as taxas
+const { installments: semJuros } = await PlugPag.calculateInstallments({
+  value: valorCentavos,
+  installmentType: InstallmentType.SELLER_INSTALLMENT,
+});
+
+// Parcelado com juros — comprador paga as taxas ao emissor
+const { installments: comJuros } = await PlugPag.calculateInstallments({
+  value: valorCentavos,
+  installmentType: InstallmentType.BUYER_INSTALLMENT,
+});
+
+// Cada item de `installments`:
+// { installments: 3, installmentValue: 5000, totalValue: 15000 }
+//   ↳ todos os valores monetários estão em centavos (divida por 100 para exibir em reais)
+
+for (const op of comJuros) {
+  console.log(
+    `${op.installments}x de R$ ${(op.installmentValue / 100).toFixed(2)}`,
+    `— total R$ ${(op.totalValue / 100).toFixed(2)}`,
+  );
+}
+```
+
+> **Dica:** faça as duas chamadas em paralelo com `Promise.allSettled` para reduzir o tempo de carregamento.
+
+```typescript
+const [vendedor, comprador] = await Promise.allSettled([
+  PlugPag.calculateInstallments({ value: valorCentavos, installmentType: InstallmentType.SELLER_INSTALLMENT }),
+  PlugPag.calculateInstallments({ value: valorCentavos, installmentType: InstallmentType.BUYER_INSTALLMENT }),
+]);
+```
+
+---
+
 ### Cancelar uma operação em andamento
 
 ```typescript
@@ -180,22 +226,23 @@ await PlugPag.initialize({ activationCode: 'SEU_CODIGO_PAGBANK' });
 
 <docgen-index>
 
-- [`isAuthenticated()`](#isauthenticated)
-- [`isServiceBusy()`](#isservicebusy)
-- [`initialize(...)`](#initialize)
-- [`doPayment(...)`](#dopayment)
-- [`abort()`](#abort)
-- [`voidPayment(...)`](#voidpayment)
-- [`imprimirTexto(...)`](#imprimirtexto)
-- [`statusImpressora()`](#statusimpressora)
-- [`printFromFile(...)`](#printfromfile)
-- [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
-- [`printPdfFromUrl(...)`](#printpdffromurl)
-- [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
-- [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
-- [`removeAllListeners()`](#removealllisteners)
-- [Interfaces](#interfaces)
-- [Enums](#enums)
+* [`isAuthenticated()`](#isauthenticated)
+* [`isServiceBusy()`](#isservicebusy)
+* [`initialize(...)`](#initialize)
+* [`doPayment(...)`](#dopayment)
+* [`abort()`](#abort)
+* [`calculateInstallments(...)`](#calculateinstallments)
+* [`voidPayment(...)`](#voidpayment)
+* [`imprimirTexto(...)`](#imprimirtexto)
+* [`statusImpressora()`](#statusimpressora)
+* [`printFromFile(...)`](#printfromfile)
+* [`reprintCustomerReceipt()`](#reprintcustomerreceipt)
+* [`printPdfFromUrl(...)`](#printpdffromurl)
+* [`addListener('paymentProgress', ...)`](#addlistenerpaymentprogress-)
+* [`addListener('voidProgress', ...)`](#addlistenervoidprogress-)
+* [`removeAllListeners()`](#removealllisteners)
+* [Interfaces](#interfaces)
+* [Enums](#enums)
 
 </docgen-index>
 
@@ -217,7 +264,8 @@ Verifica se o terminal está autenticado com o serviço PlugPag (IPC ativo).
 
 **Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
----
+--------------------
+
 
 ### isServiceBusy()
 
@@ -229,7 +277,8 @@ Verifica se o serviço PlugPag está ocupado com uma operação em andamento.
 
 **Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
----
+--------------------
+
 
 ### initialize(...)
 
@@ -246,7 +295,8 @@ Necessário apenas na primeira execução ou após reset de fábrica.
 
 **Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
 
----
+--------------------
+
 
 ### doPayment(...)
 
@@ -265,7 +315,8 @@ Use `addListener('paymentProgress', ...)` para acompanhar o progresso em tempo r
 
 **Returns:** <code>Promise&lt;<a href="#plugpagtransactionresult">PlugPagTransactionResult</a>&gt;</code>
 
----
+--------------------
+
 
 ### abort()
 
@@ -273,12 +324,33 @@ Use `addListener('paymentProgress', ...)` para acompanhar o progresso em tempo r
 abort() => Promise<{ result: ErrorCode; }>
 ```
 
-Aborta a operação de pagamento em andamento.
-Retorna imediatamente — o `doPayment` falhará com código `OPERATION_ABORTED (-1)`.
+Aborta a operação em andamento (pagamento ou estorno).
+Retorna imediatamente — o `doPayment` ou `voidPayment` falhará com código `OPERATION_ABORTED (-1)`.
 
 **Returns:** <code>Promise&lt;{ result: <a href="#errorcode">ErrorCode</a>; }&gt;</code>
 
----
+--------------------
+
+
+### calculateInstallments(...)
+
+```typescript
+calculateInstallments(options: { value: number; installmentType: InstallmentType; }) => Promise<{ installments: PlugPagInstallment[]; }>
+```
+
+Consulta as opções de parcelamento para um valor e modalidade.
+
+Operação bloqueante — o SDK consulta o serviço PagBank e retorna os valores reais
+calculados com base no plano de recebimento do lojista vinculado ao terminal.
+
+| Param         | Type                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| **`options`** | <code>{ value: number; installmentType: <a href="#installmenttype">InstallmentType</a>; }</code> |
+
+**Returns:** <code>Promise&lt;{ installments: PlugPagInstallment[]; }&gt;</code>
+
+--------------------
+
 
 ### voidPayment(...)
 
@@ -297,7 +369,8 @@ Use `addListener('voidProgress', ...)` para acompanhar o progresso.
 
 **Returns:** <code>Promise&lt;<a href="#plugpagtransactionresult">PlugPagTransactionResult</a>&gt;</code>
 
----
+--------------------
+
 
 ### imprimirTexto(...)
 
@@ -313,15 +386,16 @@ Use quebras de linha (`\n`) para múltiplas linhas.
 **Referência de largura por tamanho de fonte:**
 | `size` | chars/linha aprox. |
 |--------|--------------------|
-| 18 | ~34 |
-| 20 | ~30 (recomendado) |
-| 26 | ~23 |
+| 18     | ~34                |
+| 20     | ~30 (recomendado)  |
+| 26     | ~23                |
 
 | Param         | Type                                              |
 | ------------- | ------------------------------------------------- |
 | **`options`** | <code>{ mensagem: string; size?: number; }</code> |
 
----
+--------------------
+
 
 ### statusImpressora()
 
@@ -338,7 +412,8 @@ como resultado de uma tentativa de impressão.
 
 **Returns:** <code>Promise&lt;{ status: string; }&gt;</code>
 
----
+--------------------
+
 
 ### printFromFile(...)
 
@@ -352,7 +427,8 @@ Imprime a partir de um arquivo de imagem já salvo no dispositivo.
 | ------------- | ---------------------------------- |
 | **`options`** | <code>{ filePath: string; }</code> |
 
----
+--------------------
+
 
 ### reprintCustomerReceipt()
 
@@ -362,7 +438,8 @@ reprintCustomerReceipt() => Promise<void>
 
 Reimprimir o último comprovante do cliente diretamente pelo terminal.
 
----
+--------------------
+
 
 ### printPdfFromUrl(...)
 
@@ -380,7 +457,8 @@ apenas para esta conexão HTTPS — valide o certificado do servidor antes de us
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
 
----
+--------------------
+
 
 ### addListener('paymentProgress', ...)
 
@@ -397,7 +475,8 @@ Escuta eventos de progresso durante {@link doPayment}.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
----
+--------------------
+
 
 ### addListener('voidProgress', ...)
 
@@ -414,7 +493,8 @@ Escuta eventos de progresso durante {@link voidPayment}.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
----
+--------------------
+
 
 ### removeAllListeners()
 
@@ -425,9 +505,11 @@ removeAllListeners() => Promise<void>
 Remove todos os listeners registrados neste plugin.
 Chame no `ngOnDestroy` ou equivalente para evitar memory leaks.
 
----
+--------------------
+
 
 ### Interfaces
+
 
 #### PlugPagTransactionResult
 
@@ -456,11 +538,25 @@ Todos os campos opcionais podem ser `undefined` dependendo da bandeira e do tipo
 | **`extendedHolderName`**   | <code>string</code> | Nome do portador (campo estendido, quando disponível).                                       |
 | **`installments`**         | <code>string</code> | Número de parcelas confirmadas pelo terminal como string (ex: `"3"`).                        |
 
+
+#### PlugPagInstallment
+
+Uma opção de parcelamento retornada por {@link PlugPagPlugin.calculateInstallments}.
+Os valores monetários estão em centavos (divida por 100 para exibir em reais).
+
+| Prop                   | Type                | Description                                                |
+| ---------------------- | ------------------- | ---------------------------------------------------------- |
+| **`installments`**     | <code>number</code> | Número de parcelas (ex: `3` para 3x).                      |
+| **`installmentValue`** | <code>number</code> | Valor de cada parcela em centavos (ex: `5670` = R$ 56,70). |
+| **`totalValue`**       | <code>number</code> | Valor total com juros em centavos.                         |
+
+
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
 | ------------ | ----------------------------------------- |
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
 
 #### PaymentEvent
 
@@ -472,7 +568,9 @@ Recebido via listener `paymentProgress` ou `voidProgress`.
 | **`code`**    | <code><a href="#paymenteventcode">PaymentEventCode</a></code> | Código numérico do evento (veja {@link <a href="#paymenteventcode">PaymentEventCode</a>}). |
 | **`message`** | <code>string</code>                                           | Mensagem legível para exibição ao operador.                                                |
 
+
 ### Enums
+
 
 #### PaymentType
 
@@ -483,6 +581,7 @@ Recebido via listener `paymentProgress` ou `voidProgress`.
 | **`VOUCHER`** | <code>3</code> |
 | **`PIX`**     | <code>5</code> |
 
+
 #### InstallmentType
 
 | Members                  | Value          |
@@ -490,6 +589,7 @@ Recebido via listener `paymentProgress` ou `voidProgress`.
 | **`NO_INSTALLMENT`**     | <code>1</code> |
 | **`SELLER_INSTALLMENT`** | <code>2</code> |
 | **`BUYER_INSTALLMENT`**  | <code>3</code> |
+
 
 #### ErrorCode
 
@@ -501,6 +601,7 @@ Recebido via listener `paymentProgress` ou `voidProgress`.
 | **`COMMUNICATION_ERROR`**   | <code>-3</code> |
 | **`NO_PRINTER_DEVICE`**     | <code>-4</code> |
 | **`NO_TRANSACTION_DATA`**   | <code>-5</code> |
+
 
 #### PaymentEventCode
 

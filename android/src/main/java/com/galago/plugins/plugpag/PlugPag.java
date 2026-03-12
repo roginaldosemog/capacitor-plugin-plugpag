@@ -3,13 +3,13 @@ package com.galago.plugins.plugpag;
 import android.content.Context;
 import android.util.Log;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagActivationData;
+import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagInstallment;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagEventData;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagEventListener;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagInitializationResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPaymentData;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPrinterData;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPrintResult;
-import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagPrinterListener;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagTransactionResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagAbortResult;
 import br.com.uol.pagseguro.plugpagservice.wrapper.PlugPagVoidData;
@@ -20,8 +20,10 @@ import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.os.ParcelFileDescriptor;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import java.io.File;
+import java.util.List;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -56,24 +58,36 @@ public class PlugPag {
     public boolean isServiceBusy() { return plugPagWrapper.isServiceBusy(); }
 
     public int abort() {
+        Log.d(TAG, "abort() chamado");
         PlugPagAbortResult abortResult = plugPagWrapper.abort();
-        return abortResult.getResult(); 
+        Log.d(TAG, "abort() resultado: " + abortResult.getResult());
+        return abortResult.getResult();
     }
 
     public JSObject initialize(String activationCode) throws Exception {
+        if (plugPagWrapper.isAuthenticated()) {
+            Log.d(TAG, "initialize() ignorado — terminal já autenticado");
+            JSObject ret = new JSObject();
+            ret.put("status", "already_authenticated");
+            return ret;
+        }
+        Log.d(TAG, "initialize() iniciando ativação");
         PlugPagActivationData data = new PlugPagActivationData(activationCode);
         PlugPagInitializationResult result = plugPagWrapper.initializeAndActivatePinpad(data);
         if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "initialize() sucesso");
             JSObject ret = new JSObject();
             ret.put("status", "success");
             return ret;
         } else {
+            Log.e(TAG, "initialize() falhou: " + result.getErrorCode() + " - " + result.getErrorMessage());
             throw new Exception(result.getErrorCode() + ": " + result.getErrorMessage());
         }
     }
 
     public JSObject doPayment(int type, int amount, int installmentType, int installments, String userReference, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
+        Log.d(TAG, "doPayment() type=" + type + " amount=" + amount + " installments=" + installments + " ref=" + userReference);
 
         PlugPagPaymentData paymentData = new PlugPagPaymentData(
             type, amount, installmentType, installments, userReference, printReceipt, false, false
@@ -81,20 +95,61 @@ public class PlugPag {
 
         plugPagWrapper.setEventListener(createEventListener(listener));
         PlugPagTransactionResult result = plugPagWrapper.doPayment(paymentData);
-        
         plugPagWrapper.setEventListener(emptyListener);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "doPayment() aprovado — code=" + result.getTransactionCode() + " nsu=" + result.getHostNsu());
+        } else {
+            Log.e(TAG, "doPayment() negado — errorCode=" + result.getErrorCode() + " msg=" + result.getMessage());
+        }
         return parseResult(result);
     }
 
     public JSObject voidPayment(String transactionCode, String transactionId, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
+        Log.d(TAG, "voidPayment() transactionCode=" + transactionCode);
+
         PlugPagVoidData voidData = new PlugPagVoidData(transactionCode, transactionId, printReceipt);
-        
         plugPagWrapper.setEventListener(createEventListener(listener));
         PlugPagTransactionResult result = plugPagWrapper.voidPayment(voidData);
-        
         plugPagWrapper.setEventListener(emptyListener);
+
+        if (result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK) {
+            Log.d(TAG, "voidPayment() estorno aprovado — code=" + result.getTransactionCode());
+        } else {
+            Log.e(TAG, "voidPayment() falhou — errorCode=" + result.getErrorCode() + " msg=" + result.getMessage());
+        }
         return parseResult(result);
+    }
+
+    /**
+     * Consulta as opções de parcelamento para um determinado valor e tipo.
+     *
+     * <p>O SDK consulta o serviço PagBank e retorna os valores reais calculados
+     * com base no plano de recebimento do lojista.
+     *
+     * @param value           Valor da venda em centavos.
+     * @param installmentType Modalidade: 2 = SELLER_INSTALLMENT, 3 = BUYER_INSTALLMENT.
+     * @return Array JSON com as opções de parcelamento.
+     */
+    public JSArray calculateInstallments(int value, int installmentType) throws Exception {
+        if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
+        Log.d(TAG, "calculateInstallments() value=" + value + " type=" + installmentType);
+
+        List<PlugPagInstallment> list = plugPagWrapper.calculateInstallments(String.valueOf(value), installmentType);
+
+        JSArray result = new JSArray();
+        if (list != null) {
+            for (PlugPagInstallment item : list) {
+                JSObject obj = new JSObject();
+                obj.put("installments",     item.getQuantity());
+                obj.put("installmentValue", item.getAmount());
+                obj.put("totalValue",       item.getTotal());
+                result.put(obj);
+            }
+        }
+        Log.d(TAG, "calculateInstallments() retornou " + result.length() + " opções");
+        return result;
     }
 
     private PlugPagEventListener createEventListener(PaymentEventListener listener) {
@@ -148,16 +203,6 @@ public class PlugPag {
 
     public void printFromFile(String filePath) throws Exception {
         PlugPagPrinterData printerData = new PlugPagPrinterData(filePath, 4, 0);
-        plugPagWrapper.setPrinterListener(new PlugPagPrinterListener() {
-            @Override
-            public void onError(PlugPagPrintResult result) {
-                Log.e(TAG, "Erro na impressão: " + result.getMessage());
-            }
-            @Override
-            public void onSuccess(PlugPagPrintResult result) {
-                Log.d(TAG, "Impressão concluída");
-            }
-        });
         PlugPagPrintResult result = plugPagWrapper.printFromFile(printerData);
         if (result.getResult() != 0) {
             throw new Exception("Falha na impressão: " + result.getMessage());
@@ -198,13 +243,14 @@ public class PlugPag {
         File printDir = new File(context.getFilesDir(), "prints");
         printDir.mkdirs();
         File imageFile = new File(printDir, "print_" + System.currentTimeMillis() + ".jpg");
-        imageFile.setReadable(true, false);
 
-        FileOutputStream fos = new FileOutputStream(imageFile);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-        fos.flush();
-        fos.close();
-        bitmap.recycle();
+        try (FileOutputStream fos = new FileOutputStream(imageFile)) {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
+            fos.flush();
+        } finally {
+            bitmap.recycle();
+        }
+        imageFile.setReadable(true, false);
 
         try {
             printFromFile(imageFile.getAbsolutePath());
@@ -227,8 +273,11 @@ public class PlugPag {
         return ret;
     }
 
-    public void reprintCustomerReceipt() {
-        plugPagWrapper.reprintCustomerReceipt();
+    public void reprintCustomerReceipt() throws Exception {
+        PlugPagPrintResult result = plugPagWrapper.reprintCustomerReceipt();
+        if (result != null && result.getResult() != 0) {
+            throw new Exception("Falha na reimpressão: " + result.getMessage());
+        }
     }
 
     public void printPdfFromUrl(String urlString) throws Exception {
@@ -255,6 +304,12 @@ public class PlugPag {
         connection.setReadTimeout(30000);
         connection.connect();
 
+        int httpStatus = connection.getResponseCode();
+        if (httpStatus < 200 || httpStatus >= 300) {
+            connection.disconnect();
+            throw new Exception("Falha ao baixar PDF: HTTP " + httpStatus);
+        }
+
         File printDir = new File(context.getFilesDir(), "prints");
         printDir.mkdirs();
         File pdfFile = new File(printDir, "doc_" + System.currentTimeMillis() + ".pdf");
@@ -266,41 +321,46 @@ public class PlugPag {
             while ((len = in.read(buffer)) != -1) {
                 out.write(buffer, 0, len);
             }
+        } finally {
+            connection.disconnect();
         }
 
         ParcelFileDescriptor pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY);
-        PdfRenderer renderer = new PdfRenderer(pfd);
         try {
-            int pageCount = renderer.getPageCount();
-            for (int i = 0; i < pageCount; i++) {
-                PdfRenderer.Page page = renderer.openPage(i);
+            PdfRenderer renderer = new PdfRenderer(pfd);
+            try {
+                int pageCount = renderer.getPageCount();
+                for (int i = 0; i < pageCount; i++) {
+                    PdfRenderer.Page page = renderer.openPage(i);
 
-                int printWidth = 384;
-                float scale = (float) printWidth / page.getWidth();
-                int printHeight = (int) (page.getHeight() * scale);
+                    int printWidth = 384;
+                    float scale = (float) printWidth / page.getWidth();
+                    int printHeight = (int) (page.getHeight() * scale);
 
-                // ARGB_8888 é exigido pelo PdfRenderer
-                Bitmap bitmap = Bitmap.createBitmap(printWidth, printHeight + 40, Bitmap.Config.ARGB_8888);
-                bitmap.eraseColor(Color.WHITE);
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
-                page.close();
+                    // ARGB_8888 é exigido pelo PdfRenderer
+                    Bitmap bitmap = Bitmap.createBitmap(printWidth, printHeight + 40, Bitmap.Config.ARGB_8888);
+                    bitmap.eraseColor(Color.WHITE);
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
+                    page.close();
 
-                File pageFile = new File(printDir, "page_" + i + "_" + System.currentTimeMillis() + ".jpg");
-                pageFile.setReadable(true, false);
-                FileOutputStream fos = new FileOutputStream(pageFile);
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
-                fos.flush();
-                fos.close();
-                bitmap.recycle();
+                    File pageFile = new File(printDir, "page_" + i + "_" + System.currentTimeMillis() + ".jpg");
+                    try (FileOutputStream fos = new FileOutputStream(pageFile)) {
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
+                        fos.flush();
+                    }
+                    bitmap.recycle();
+                    pageFile.setReadable(true, false);
 
-                try {
-                    printFromFile(pageFile.getAbsolutePath());
-                } finally {
-                    pageFile.delete();
+                    try {
+                        printFromFile(pageFile.getAbsolutePath());
+                    } finally {
+                        pageFile.delete();
+                    }
                 }
+            } finally {
+                renderer.close();
             }
         } finally {
-            renderer.close();
             pfd.close();
             pdfFile.delete();
         }

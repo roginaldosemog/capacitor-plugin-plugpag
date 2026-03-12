@@ -1,10 +1,12 @@
 package com.galago.plugins.plugpag;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -45,15 +47,39 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void doPayment(PluginCall call) {
-        executeSharedOperation("paymentProgress", call);
+        executeBlockingOperation("paymentProgress", call);
     }
 
     @PluginMethod
     public void voidPayment(PluginCall call) {
-        executeSharedOperation("voidProgress", call);
+        executeBlockingOperation("voidProgress", call);
     }
 
-    private void executeSharedOperation(String eventName, PluginCall call) {
+    @PluginMethod
+    public void calculateInstallments(PluginCall call) {
+        Integer value = call.getInt("value");
+        Integer installmentType = call.getInt("installmentType");
+        if (value == null) { call.reject("value obrigatório"); return; }
+        if (installmentType == null) { call.reject("installmentType obrigatório"); return; }
+        // Operação de consulta (somente-leitura) — não usa operationMutex para permitir
+        // que as duas chamadas paralelas (SELLER + BUYER) executem simultaneamente.
+        ioExecutor.submit(() -> {
+            try {
+                JSArray list = implementation.calculateInstallments(value, installmentType);
+                JSObject ret = new JSObject();
+                ret.put("installments", list);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Executa doPayment ou voidPayment sob o mutex — impede operações bloqueantes paralelas.
+     * O abort() deliberadamente NÃO usa o mutex: precisa interromper o doPayment que já o detém.
+     */
+    private void executeBlockingOperation(String eventName, PluginCall call) {
         ioExecutor.submit(() -> {
             boolean acquired = false;
             try {
@@ -94,6 +120,30 @@ public class PlugPagPlugin extends Plugin {
         });
     }
 
+    /**
+     * Executa uma operação bloqueante simples (sem eventos de progresso) sob o mutex.
+     * Cobre: initialize (ativação) e reprintCustomerReceipt.
+     * Nota: calculateInstallments NÃO usa este método — é consulta somente-leitura.
+     */
+    private void executeBlockingSimple(Callable<JSObject> action, PluginCall call) {
+        ioExecutor.submit(() -> {
+            boolean acquired = false;
+            try {
+                acquired = operationMutex.tryAcquire(10, TimeUnit.SECONDS);
+                if (!acquired) {
+                    call.reject("Terminal ocupado. Tente novamente ou cancele a operação.");
+                    return;
+                }
+                JSObject result = action.call();
+                if (result != null) call.resolve(result); else call.resolve();
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            } finally {
+                if (acquired) operationMutex.release();
+            }
+        });
+    }
+
     private void notifyProgress(String eventName, String message, int code) {
         JSObject data = new JSObject();
         data.put("message", message);
@@ -123,11 +173,7 @@ public class PlugPagPlugin extends Plugin {
     public void initialize(PluginCall call) {
         String code = call.getString("activationCode");
         if (code == null) { call.reject("Código obrigatório"); return; }
-        ioExecutor.submit(() -> {
-            try {
-                call.resolve(implementation.initialize(code));
-            } catch (Exception e) { call.reject(e.getMessage()); }
-        });
+        executeBlockingSimple(() -> implementation.initialize(code), call);
     }
 
     @PluginMethod
@@ -165,14 +211,10 @@ public class PlugPagPlugin extends Plugin {
 
     @PluginMethod
     public void reprintCustomerReceipt(PluginCall call) {
-        ioExecutor.submit(() -> {
-            try {
-                implementation.reprintCustomerReceipt();
-                call.resolve();
-            } catch (Exception e) {
-                call.reject("Erro ao reimprimir: " + e.getMessage());
-            }
-        });
+        executeBlockingSimple(() -> {
+            implementation.reprintCustomerReceipt();
+            return null;
+        }, call);
     }
 
     @PluginMethod
