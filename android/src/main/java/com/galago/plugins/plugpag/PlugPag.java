@@ -91,7 +91,7 @@ public class PlugPag {
         Log.d(TAG, "doPayment() type=" + type + " amount=" + amount + " installments=" + installments + " ref=" + userReference);
 
         PlugPagPaymentData paymentData = new PlugPagPaymentData(
-            type, amount, installmentType, installments, userReference, printReceipt, false, false
+            type, amount, installmentType, installments, userReference, printReceipt, true, false
         );
 
         plugPagWrapper.setEventListener(createEventListener(listener));
