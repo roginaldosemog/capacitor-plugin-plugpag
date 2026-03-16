@@ -46,6 +46,25 @@ public class PlugPagPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void performPrePaymentInit(PluginCall call) {
+        ioExecutor.submit(() -> {
+            boolean acquired = false;
+            try {
+                acquired = operationMutex.tryAcquire(10, TimeUnit.SECONDS);
+                if (!acquired) { call.reject("Terminal ocupado."); return; }
+                JSObject result = implementation.performPrePaymentInit(
+                    (msg, code) -> notifyProgress("paymentProgress", msg, code)
+                );
+                call.resolve(result);
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            } finally {
+                if (acquired) operationMutex.release();
+            }
+        });
+    }
+
+    @PluginMethod
     public void doPayment(PluginCall call) {
         executeBlockingOperation("paymentProgress", call);
     }

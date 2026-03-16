@@ -186,6 +186,12 @@ export interface PlugPagPlugin {
   /**
    * Verifica se o terminal está autenticado com o serviço PlugPag (IPC ativo).
    */
+  /**
+   * Executa inicialização pré-pagamento chamando `initializeAndActivatePinpad` com código vazio.
+   * Força atualização de tabelas EMV antes do `doPayment`, emitindo progresso via `paymentProgress`.
+   * Nunca lança exceção — erros são suprimidos para não bloquear o fluxo de pagamento.
+   */
+  performPrePaymentInit(): Promise<{ status: 'ok' | 'failed' }>;
   isAuthenticated(): Promise<{ value: boolean }>;
 
   /**

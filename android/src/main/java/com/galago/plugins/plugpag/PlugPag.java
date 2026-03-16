@@ -86,6 +86,31 @@ public class PlugPag {
         }
     }
 
+    /**
+     * Chama initializeAndActivatePinpad antes do doPayment para forçar atualização
+     * de tabelas EMV (AID/CAPK) com feedback visual via paymentProgress.
+     * Erros são suprimidos — a falha aqui não impede o pagamento.
+     */
+    public JSObject performPrePaymentInit(PaymentEventListener listener) {
+        Log.d(TAG, "performPrePaymentInit() chamado");
+        try {
+            PlugPagActivationData data = new PlugPagActivationData("");
+            plugPagWrapper.setEventListener(createEventListener(listener));
+            PlugPagInitializationResult result = plugPagWrapper.initializeAndActivatePinpad(data);
+            plugPagWrapper.setEventListener(emptyListener);
+            JSObject ret = new JSObject();
+            ret.put("status", result.getResult() == br.com.uol.pagseguro.plugpagservice.wrapper.PlugPag.RET_OK ? "ok" : "failed");
+            Log.d(TAG, "performPrePaymentInit() resultado: " + ret.getString("status"));
+            return ret;
+        } catch (Exception e) {
+            plugPagWrapper.setEventListener(emptyListener);
+            Log.w(TAG, "performPrePaymentInit() erro (ignorado): " + e.getMessage());
+            JSObject ret = new JSObject();
+            ret.put("status", "failed");
+            return ret;
+        }
+    }
+
     public JSObject doPayment(int type, int amount, int installmentType, int installments, String userReference, boolean printReceipt, PaymentEventListener listener) throws Exception {
         if (!plugPagWrapper.isAuthenticated()) throw new Exception("POS não autenticado!");
         Log.d(TAG, "doPayment() type=" + type + " amount=" + amount + " installments=" + installments + " ref=" + userReference);
