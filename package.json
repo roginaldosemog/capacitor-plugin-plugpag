@@ -1,6 +1,6 @@
 {
   "name": "capacitor-plugin-plugpag",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Integração PagBank PlugPag SDK para Ionic/Capacitor",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",

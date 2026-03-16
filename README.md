@@ -217,6 +217,7 @@ await PlugPag.initialize({ activationCode: 'SEU_CODIGO_PAGBANK' });
 
 <docgen-index>
 
+* [`performPrePaymentInit()`](#performprepaymentinit)
 * [`isAuthenticated()`](#isauthenticated)
 * [`isServiceBusy()`](#isservicebusy)
 * [`initialize(...)`](#initialize)
@@ -245,13 +246,26 @@ Interface principal do plugin PlugPag para Capacitor.
 Permite integrar o terminal de pagamento PagBank Smart (e compatíveis) em aplicações
 Ionic/Capacitor via PlugPag SDK Android.
 
+### performPrePaymentInit()
+
+```typescript
+performPrePaymentInit() => Promise<{ status: 'ok' | 'failed'; }>
+```
+
+Executa inicialização pré-pagamento chamando `initializeAndActivatePinpad` com código vazio.
+Força atualização de tabelas EMV antes do `doPayment`, emitindo progresso via `paymentProgress`.
+Nunca lança exceção — erros são suprimidos para não bloquear o fluxo de pagamento.
+
+**Returns:** <code>Promise&lt;{ status: 'ok' | 'failed'; }&gt;</code>
+
+--------------------
+
+
 ### isAuthenticated()
 
 ```typescript
 isAuthenticated() => Promise<{ value: boolean; }>
 ```
-
-Verifica se o terminal está autenticado com o serviço PlugPag (IPC ativo).
 
 **Returns:** <code>Promise&lt;{ value: boolean; }&gt;</code>
 
