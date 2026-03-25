@@ -187,9 +187,8 @@ public class PlugPag {
                 if (data.getEventCode() == PlugPagEventData.EVENT_CODE_DIGIT_PASSWORD) {
                     passwordCount++;
                     msg = "SENHA: " + new String(new char[passwordCount]).replace("\0", "*");
-                } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_NO_PASSWORD) {
-                    passwordCount = 0;
-                    msg = "DIGITE A SENHA";
+                } else if (data.getEventCode() == PlugPagEventData.EVENT_CODE_CONTACTLESS_ON_DEVICE) {
+                    msg = "MANTENHA O CARTÃO PRÓXIMO";
                 } else {
                     msg = data.getCustomMessage() != null ? data.getCustomMessage() : "PROCESSANDO...";
                 }
